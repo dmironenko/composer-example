@@ -1,0 +1,6 @@
+compose:
+  services:
+    nginx:
+      networks:
+        default:
+          aliases: [nginx-stage]

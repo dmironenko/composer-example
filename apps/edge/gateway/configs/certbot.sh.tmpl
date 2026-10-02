@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+{{ if not .Vars.tls.acme -}}
+exec sleep infinity
+{{ else -}}
+trap 'exit 0' TERM INT
+while :; do
+    if certbot certonly --non-interactive --agree-tos --keep-until-expiring \
+        --standalone --preferred-challenges http --http-01-port 8080 \
+        --cert-name site --domain {{ quote .Vars.tls.domain }} --email {{ quote .Vars.tls.email }} \
+        --server {{ quote .Vars.tls.server }} --deploy-hook 'python /config/publish.py'; then
+        # Retry publication even when the prior deploy hook failed after issuance.
+        if python /config/publish.py; then
+            sleep {{ .Vars.tls.renew_interval }} & wait $!
+            continue
+        fi
+    fi
+    sleep {{ .Vars.tls.retry_interval }} & wait $!
+done
+{{ end -}}

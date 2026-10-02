@@ -1,0 +1,24 @@
+events {}
+http {
+    resolver 127.0.0.11 valid=2s ipv6=off;
+    upstream api {
+        zone api 64k;
+        server api-http:8080 resolve;
+    }
+    upstream web {
+        zone web 64k;
+        server web-http:8080 resolve;
+    }
+    server {
+        listen 8080;
+        add_header X-Composer-Environment {{ quote .Env }} always;
+        add_header X-Config-Revision {{ quote .Vars.config_revision }} always;
+        location = /healthz { return 200 'ok\n'; }
+        location /api/ {
+            proxy_pass http://api/;
+        }
+        location / {
+            proxy_pass http://web/;
+        }
+    }
+}
