@@ -27,13 +27,36 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary")
     parser.add_argument("host", type=Path)
+    parser.add_argument("--https-port", type=int, default=18443)
     args = parser.parse_args()
     host = args.host.resolve()
     settings = yaml.safe_load(host.read_text())
     repo = (host.parent / settings["source"]["path"]).resolve()
+    # Create the namespace networks and gateway before attaching the test CA.
+    report = json.loads(
+        run(args.binary, "apply", "--config", str(host), "--wait").splitlines()[-1]
+    )
+    project = next(
+        p["name"]
+        for p in report["projects"]
+        if p["enabled"] and "-edge-gateway-" in p["name"]
+    )
+    gateway_id = run(
+        "docker",
+        "ps",
+        "-q",
+        "--filter",
+        f"label=com.docker.compose.project={project}",
+        "--filter",
+        "label=com.docker.compose.service=nginx",
+    )
+    networks = json.loads(run("docker", "inspect", gateway_id))[0]["NetworkSettings"][
+        "Networks"
+    ]
+    network = next(n for n in networks if "-prod-edge-" in n)
     fixture = host.parent / "acme-test"
     fixture.mkdir()
-    ca = "composer-example-acme-test"
+    ca = settings["installation"] + "-acme-test"
     run("docker", "create", "--name", ca, PEBBLE)
     run(
         "docker",
@@ -44,7 +67,7 @@ def main() -> None:
     run("docker", "cp", f"{ca}:/test/certs/pebble.minica.pem", str(fixture / "ca.pem"))
     run("docker", "rm", ca)
     config = json.loads((fixture / "pebble.json").read_text())
-    config["pebble"]["httpPort"] = 18080
+    config["pebble"]["httpPort"] = 80
     (fixture / "pebble.json").write_text(json.dumps(config))
     run(
         "docker",
@@ -53,9 +76,11 @@ def main() -> None:
         "--name",
         ca,
         "--network",
-        "host",
-        "--add-host",
-        "composer.test:127.0.0.1",
+        network,
+        "--network-alias",
+        "pebble",
+        "-p",
+        "127.0.0.1::15000",
         "-e",
         "PEBBLE_VA_NOSLEEP=1",
         "-e",
@@ -68,11 +93,15 @@ def main() -> None:
         "-config",
         "/test/config/check.json",
     )
+    binding = json.loads(run("docker", "inspect", ca))[0]["NetworkSettings"]["Ports"][
+        "15000/tcp"
+    ][0]
+    management_port = binding["HostPort"]
     trust = ssl.create_default_context(cafile=str(fixture / "ca.pem"))
     for _ in range(30):
         try:
             with urllib.request.urlopen(
-                "https://localhost:15000/roots/0", context=trust
+                f"https://localhost:{management_port}/roots/0", context=trust
             ) as response:
                 (fixture / "root.pem").write_bytes(response.read())
             break
@@ -81,28 +110,33 @@ def main() -> None:
 
     gateway = repo / "apps/edge/gateway"
     shutil.copyfile(fixture / "ca.pem", gateway / "configs/pebble-ca.pem")
-    (gateway / "vars/prod.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "tls": {
-                    "acme": True,
-                    "domain": "composer.test",
-                    "email": "test@example.test",
-                    "server": "https://pebble:14000/dir",
-                },
-                "compose": {
-                    "services": {
-                        "certbot": {
-                            "extra_hosts": ["pebble:host-gateway"],
-                            "environment": {
-                                "REQUESTS_CA_BUNDLE": "/config/pebble-ca.pem"
-                            },
-                        }
-                    }
-                },
-            }
-        )
+    override = gateway / "vars/prod.yaml"
+    values = yaml.safe_load(override.read_text()) if override.exists() else {}
+    values.setdefault("tls", {})["domain"] = "composer.test"
+    compose = values.setdefault("compose", {})
+    nginx = compose.setdefault("services", {}).setdefault("nginx", {})
+    nginx.update(
+        {
+            "networks": {
+                "default": {"aliases": ["composer.test"]},
+                "prod_demo": {},
+                "stage_demo": {},
+            },
+            "volumes": [
+                "./configs:/etc/nginx/user_conf.d:ro",
+                "./configs/redirector.conf:/etc/nginx/conf.d/redirector.conf:ro",
+                "acme_certificates:/etc/letsencrypt",
+            ],
+            "environment": {
+                "REQUESTS_CA_BUNDLE": "/etc/nginx/user_conf.d/pebble-ca.pem",
+                "USE_LOCAL_CA": "0",
+                "CERTBOT_EMAIL": "test@example.test",
+                "CERTBOT_PRODUCTION_URL": "https://pebble:14000/dir",
+            },
+        }
     )
+    compose["volumes"] = {"acme_certificates": {}}
+    override.write_text(yaml.safe_dump(values))
     run("git", "-C", str(repo), "add", "apps")
     run("git", "-C", str(repo), "commit", "-qm", "test local ACME")
     result = run(
@@ -126,7 +160,9 @@ def main() -> None:
 
     def fingerprint():
         context = ssl.create_default_context(cafile=str(fixture / "root.pem"))
-        with socket.create_connection(("127.0.0.1", 18443), timeout=5) as connection:
+        with socket.create_connection(
+            ("127.0.0.1", args.https_port), timeout=5
+        ) as connection:
             with context.wrap_socket(
                 connection, server_hostname="composer.test"
             ) as secure:
@@ -141,7 +177,7 @@ def main() -> None:
             except (OSError, ssl.SSLError):
                 pass
             time.sleep(1)
-        raise AssertionError("HAProxy did not serve a trusted, renewed certificate")
+        raise AssertionError("nginx did not serve a trusted, renewed certificate")
 
     first = issued()
     ids = run("docker", "ps", "-q").split()
@@ -152,15 +188,9 @@ def main() -> None:
     run(
         "docker",
         "exec",
-        service("certbot"),
-        "certbot",
-        "renew",
-        "--cert-name",
-        "site",
-        "--force-renewal",
-        "--non-interactive",
-        "--deploy-hook",
-        "python /config/publish.py",
+        service("nginx"),
+        "/scripts/run_certbot.sh",
+        "force",
     )
     issued(first)
     after = {
@@ -173,11 +203,11 @@ def main() -> None:
         flush=True,
     )
 
-    # Persisted PEM must also be used after HAProxy itself restarts.
+    # Persisted PEM must also be used after nginx itself restarts.
     current = fingerprint()
-    run("docker", "restart", service("haproxy"))
+    run("docker", "restart", service("nginx"))
     assert issued() == current
-    print("PASS: renewed certificate persisted across HAProxy restart", flush=True)
+    print("PASS: renewed certificate persisted across nginx restart", flush=True)
     run("docker", "rm", "-f", ca)
 
 

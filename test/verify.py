@@ -21,6 +21,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary")
     parser.add_argument("host", type=Path)
+    parser.add_argument("--https-port", type=int, default=18443)
     args = parser.parse_args()
     host = args.host.resolve()
     settings = yaml.safe_load(host.read_text())
@@ -35,17 +36,17 @@ def main() -> None:
 
     report = apply()
     projects = {p["name"]: p for p in report["projects"] if p["enabled"]}
-    proxy_config = next(state.glob("deployments/prod/*/configs/*/configs/haproxy.cfg"))
-    token = re.search(
-        r"req.cook\(composer_stage\) -m str (\S+)", proxy_config.read_text()
-    )[1]
+    proxy_config = next(state.glob("deployments/prod/*/configs/*/configs/edge.conf"))
+    token = re.search(r'"([^"\s]+)" stage;', proxy_config.read_text())[1]
     encrypted = (repo / "apps/edge/gateway/vars/base.yaml").read_text()
     assert "ENC[AES256_GCM," in encrypted and token not in encrypted
     tls = ssl._create_unverified_context()  # Only the local bootstrap certificate.
 
     def request(path="/api/", cookie=None):
         headers = {} if cookie is None else {"Cookie": f"composer_stage={cookie}"}
-        req = urllib.request.Request("https://localhost:18443" + path, headers=headers)
+        req = urllib.request.Request(
+            f"https://localhost:{args.https_port}" + path, headers=headers
+        )
         try:
             with urllib.request.urlopen(req, context=tls, timeout=35) as response:
                 return response.status, response.headers, response.read().decode()

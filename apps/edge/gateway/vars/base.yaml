@@ -1,11 +1,6 @@
 tls:
     domain: localhost
-    email: ops@example.invalid
-    acme: false
-    server: https://acme-v02.api.letsencrypt.org/directory
     https_port: 18443
-    renew_interval: 43200
-    retry_interval: 30
 namespace_networks:
     prod_demo:
         environment: prod
@@ -15,78 +10,51 @@ namespace_networks:
         namespace: demo
 compose:
     services:
-        bootstrap:
-            image: certbot/certbot:v5.8.0@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20
-            entrypoint:
-                - python
-                - /config/bootstrap.py
-            restart: "no"
-            volumes:
-                - ./configs:/config:ro
-                - certificates:/certificates
-        haproxy:
-            image: haproxy:3.2.25-alpine@sha256:61074191875132a4a61e864f9ec4880b88553b237df7aadecb70060ec44cd63d
-            user: "0:0"
-            command:
-                - haproxy
-                - -W
-                - -db
-                - -f
-                - /usr/local/etc/haproxy/haproxy.cfg
+        nginx:
+            image: jonasal/nginx-certbot:6.2.0-alpine@sha256:60a3ff8e236b2a3ee0daac57ba83b39110771ac48e9b58d80bc3a357bbec4a28
+            environment:
+                CERTBOT_EMAIL: ops@example.invalid
+                USE_LOCAL_CA: "1"
+                RENEWAL_INTERVAL: 12h
             ports:
                 - 127.0.0.1:18080:80
                 - 127.0.0.1:18443:443
             volumes:
-                - ./configs/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-                - certificates:/certificates:ro
-                - runtime:/runtime
+                - ./configs/edge.conf:/etc/nginx/user_conf.d/edge.conf:ro
+                - ./configs/redirector.conf:/etc/nginx/conf.d/redirector.conf:ro
+                - letsencrypt:/etc/letsencrypt
+                - local_ca:/etc/local_ca
             networks:
                 - default
                 - prod_demo
                 - stage_demo
-            depends_on:
-                bootstrap:
-                    condition: service_completed_successfully
             healthcheck:
                 test:
                     - CMD
                     - wget
+                    - --no-check-certificate
                     - -qO-
-                    - http://127.0.0.1/healthz
+                    - https://127.0.0.1/healthz
                 interval: 2s
-                timeout: 1s
-                retries: 10
-        certbot:
-            image: certbot/certbot:v5.8.0@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20
-            entrypoint:
-                - /bin/sh
-                - /config/certbot.sh
-            volumes:
-                - ./configs:/config:ro
-                - certificates:/certificates
-                - runtime:/runtime
-                - letsencrypt:/etc/letsencrypt
-            depends_on:
-                haproxy:
-                    condition: service_healthy
+                timeout: 2s
+                retries: 30
     volumes:
-        certificates: {}
-        runtime: {}
         letsencrypt: {}
+        local_ca: {}
 secrets:
-    stage_token: ENC[AES256_GCM,data:1M6iC1qMcrOxRdZ4T2/6bnlvuqC1LTiqngXAMGyNyadDYtBDHr4aFCMwml5P4B0Tfv3qQLwum3t7qzrNA6WOeg==,iv:TfsPLLHrIRgxFhoyn8lIA3dwirWVYAzXeNZ3Arvh9T0=,tag:bhigAigkpCX856iU+QKSEw==,type:str]
+    stage_token: ENC[AES256_GCM,data:ZCd9qL9/preUl91E5dIHMJRnsL5RcVCvQnHhmcXFw2WEroKQ6Clx/KUNYShVDW1oWoAN1WkE6qGtRKaHwApYXw==,iv:hKKGCosBsNdFeXTrlK4f7ydgS/81SPKT17yeg3VMcNg=,tag:0vJk/Jr6Mb0hj8J55WNhEw==,type:str]
 sops:
     age:
         - recipient: age1v00znz877vm9w47cyu0le28469cxkwvlwlfx4y4qgtk8vsky64hqukhrlu
           enc: |
             -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSYVFtQ3hzSGpCeUcyUTFP
-            eHBHR3RYb1RoQSt2blRhNyt5SGJXYUcrR21vCmVXYmc4bUFzV1d6L0hwcVllWFhB
-            T0ZZQUlTTk4xdmFYc3NCZkRoUFVncWcKLS0tIERob1BTNlFJWW11ZDIwcUQrSkwv
-            V1N5ZFVWSTVNSWNDMUFaUTM0c2lkYzQKOyEhDkp+TrLhPb+rJnJcEI+3kII6SEb5
-            qmb0Elhv5mTrZpYoszWLs0argE5bgtibiLK5DrtWA2aCWVymyQPMaA==
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaQWw2b2krbUZhc3dycTJR
+            cDdPbzU1RmF1YVVnS29qNmJuQ2dhOHcwZ2kwClBrQ0JTeUFNVWRWbU9iVG9uRGg0
+            eGoweFNXOFpkQmtpKzAxa1JPTzd4cDgKLS0tIEZ0ZU1Id1g5SzFDNU8zcitkUStW
+            MnBJTUhEcmYxSUlRTnlxa3o3OU4xVWsKYUIs9R2r10Y8qwOzBNHvEySvd9xeh+Pv
+            ZPNmqINmBNRg+vD2uX1/IxIsG9M6L3cuT2VjKoGBdVVSJNmkpd2zaQ==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-10-02T09:27:17Z"
-    mac: ENC[AES256_GCM,data:B0BZBebpwolw58YFn2IHMNSnqMvzwH5lgVYJwgO8okryQOxFli29CdKPCDXegXeHii5zowxeaxEF0Pi2HLltQzIGzfP9CK3EMLCDuFjwbaT/nPGQhOIaxVwlh7ZT16lHzM7NIf4ijRYTxNHIJM6kHuJhL/MSP+UgKlbiLCTVDfo=,iv:qR+iJ/SxITDFG0ETBIAyPQ2Z2YFT5XpjRmwFTCI+CWo=,tag:MVKwwDJkLEBbjX2ClSnWRw==,type:str]
+    lastmodified: "2026-10-02T21:40:17Z"
+    mac: ENC[AES256_GCM,data:5Osl1Gykqgos47Q5quOivlgyPICGnCWgTDQRyUXrcoUxnix7W3BlVxbjsMPamNsqTmyBLFAna4+vXbcVZcf/+WjfZ9JvncXwYTcsgXOxI2br1T08JqCo3as3iFF3LUL/nkfoNbhTBPDv1hDO2AhA8mClBkOJEBgujLZDsDH7lMk=,iv:yIvdLVTWHebwxVoyJvxr9vgejPcpc6yubFMZcJN9fkE=,tag:d7WRbbj69rAb2eYbwjnloA==,type:str]
     encrypted_regex: ^secrets$
     version: 3.12.2

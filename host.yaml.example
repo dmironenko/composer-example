@@ -3,7 +3,9 @@ installation: composer-example
 source:
   mode: local
   path: composer-example
-  branch: master
+  branches:
+    prod: master
+    stage: dev
   poll_interval: 2s
 state_dir: composer-example-state
 age_key_file: composer-example.agekey

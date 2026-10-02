@@ -68,9 +68,9 @@ def main():
 
     def token():
         # Read the active version inside Docker; Desktop may expose VM-only mount paths.
-        gateway = next(c for c in snapshot().values() if c["Config"]["Labels"].get("com.docker.compose.service") == "haproxy")
-        config = run("docker", "exec", gateway["Id"], "cat", "/usr/local/etc/haproxy/haproxy.cfg")
-        return re.search(r"req.cook\(composer_stage\) -m str (\S+)", config)[1]
+        gateway = next(c for c in snapshot().values() if c["Config"]["Labels"].get("com.docker.compose.service") == "nginx" and "-edge-gateway-" in c["Config"]["Labels"]["com.docker.compose.project"])
+        config = run("docker", "exec", gateway["Id"], "cat", "/etc/nginx/user_conf.d/edge.conf")
+        return re.search(r'"([^"\s]+)" stage;' , config)[1]
 
     def response(cookie=None):
         req = urllib.request.Request("https://localhost:18443/api/",

@@ -1,0 +1,9 @@
+server {
+    listen 80 default_server;
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+    location / {
+        return 308 https://{{ .Vars.tls.domain }}:{{ .Vars.tls.https_port }}$request_uri;
+    }
+}
