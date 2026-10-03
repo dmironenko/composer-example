@@ -14,6 +14,9 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from verify import set_value
+
 
 def run(*args):
     return subprocess.check_output(args, text=True).strip()
@@ -29,6 +32,8 @@ def main():
     root, repo = host.parent, host.parent / "repo"
     settings = yaml.safe_load(host.read_text())
     prefix = settings["installation"] + "-"
+    base_file = repo / "apps/demo/api/vars/base.yaml"
+    age_key = root / settings["age_key_file"]
     first, second = json.loads((root / "commits.json").read_text())
     tls = ssl._create_unverified_context()  # Test bootstrap certificate only.
 
@@ -70,11 +75,11 @@ def main():
         # Read the active version inside Docker; Desktop may expose VM-only mount paths.
         gateway = next(c for c in snapshot().values() if c["Config"]["Labels"].get("com.docker.compose.service") == "nginx" and "-edge-gateway-" in c["Config"]["Labels"]["com.docker.compose.project"])
         config = run("docker", "exec", gateway["Id"], "cat", "/etc/nginx/user_conf.d/edge.conf")
-        return re.search(r'"([^"\s]+)" stage;' , config)[1]
+        return re.search(r'"([^"\s]+):stage" env_stage;' , config)[1]
 
     def response(cookie=None):
         req = urllib.request.Request("https://localhost:18443/api/",
-                                     headers={} if cookie is None else {"Cookie": f"composer_stage={cookie}"})
+                                     headers={} if cookie is None else {"Cookie": f"composer_stage={cookie}:stage"})
         with urllib.request.urlopen(req, context=tls, timeout=5) as result:
             return result.read().decode()
 
@@ -107,8 +112,7 @@ def main():
         expect("api: staging", "source-one", cookie=token())
         assert saved["ids"] == {n: c["Id"] for n, c in snapshot().items()}
         assert sql("prod", "SELECT value FROM acceptance WHERE id=2") == "preserved"
-        prod_file = repo / "apps/demo/api/vars/prod.yaml"
-        prod_file.write_text("message: 'api: reboot-polled'\n")
+        set_value(base_file, ["message"], "api: reboot-polled", age_key)
         commit("polling after reboot")
         expect("api: reboot-polled")
         run("git", "-C", str(repo), "revert", "--no-edit", "HEAD")
@@ -162,8 +166,7 @@ def main():
     key = root / settings["build_auth"]["key_file"]
     key.rename(key.with_suffix(".disabled"))
     try:
-        prod_file = repo / "apps/demo/api/vars/prod.yaml"
-        prod_file.write_text(yaml.safe_dump({"build": {"commit": second}}))
+        set_value(base_file, ["build", "commit"], second, age_key)
         commit("promote source-two")
         apply()
         expect("source-two")
@@ -172,7 +175,7 @@ def main():
         expect("source-one")
         assert app("prod", "api")["Image"] == prod["Image"]
         before = snapshot()
-        prod_file.write_text("message: 'api: cached-config'\n")
+        set_value(base_file, ["message"], "api: cached-config", age_key)
         commit("config-only without source access")
         apply()
         expect("api: cached-config", "source-one")
@@ -198,7 +201,7 @@ def main():
     assert app("prod", "api")["Id"] == next(c["Id"] for c in before.values() if "-prod-demo-api-" in c["Name"])
     assert app("stage", "nginx")["Id"] != next(c["Id"] for c in before.values() if "-stage-demo-nginx-" in c["Name"])
     revert()
-    prod_file.write_text("compose:\n  services:\n    api-http:\n      entrypoint: [sh, -c, 'exit 1']\n")
+    set_value(base_file, ["compose", "services", "api-http", "entrypoint"], ["sh", "-c", "exit 1"], age_key)
     commit("failed runtime rollout")
     apply(fail=True)
     revert()
@@ -218,7 +221,7 @@ def main():
             time.sleep(3)
             assert process.poll() is None
             assert identity(snapshot()) == identity(before)
-            prod_file.write_text("message: 'api: polled'\n")
+            set_value(base_file, ["message"], "api: polled", age_key)
             commit("remote polling update")
             expect("api: polled")
             neighbours(before, lambda c: "-prod-demo-api-" in c["Config"]["Labels"]["com.docker.compose.project"])

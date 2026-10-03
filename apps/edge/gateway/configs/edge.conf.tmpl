@@ -1,22 +1,24 @@
 map_hash_bucket_size 128;
 
+{{ $default := "" }}
+{{ range .Environments }}{{ if eq . "prod" }}{{ $default = "env_prod" }}{{ end }}{{ end }}
 map $cookie_composer_stage $environment_backend {
-    default prod;
-    "{{ .Secrets.stage_token }}" stage;
+    default {{ quote $default }};
+    "~^{{ .Secrets.stage_token }}:" "";
+{{ range .Environments }}{{ if ne . "prod" }}
+    "{{ $.Secrets.stage_token }}:{{ . }}" env_{{ . }};
+{{ end }}{{ end }}
 }
 
 resolver 127.0.0.11 valid=2s ipv6=off;
 resolver_timeout 2s;
 
-upstream prod {
-    zone prod 64k;
-    server nginx-prod:8080 resolve;
+{{ range .Environments }}
+upstream env_{{ . }} {
+    zone env_{{ . }} 64k;
+    server nginx-{{ . }}:8080 resolve;
 }
-
-upstream stage {
-    zone stage 64k;
-    server nginx-stage:8080 resolve;
-}
+{{ end }}
 
 server {
     listen 443 ssl;
@@ -28,6 +30,7 @@ server {
     location = /healthz { return 200 "ok\n"; }
 
     location / {
+        if ($environment_backend = "") { return 503; }
         proxy_pass http://$environment_backend;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;

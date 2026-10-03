@@ -27,7 +27,10 @@ limactl shell composer-acceptance sudo bash -c \
 Для Intel используйте `GOARCH=amd64`. VM не монтирует каталоги хоста и не
 публикует порты приложений. Отдельный SSH daemon слушает только loopback VM,
 предоставляя настоящие Git-over-SSH repositories для source checkout и polling.
-Ключи лежат вне GitOps. На VM не устанавливаются SOPS, age, Go или buildx.
+Ключи лежат вне GitOps. На VM не нужны age, Go или buildx. SOPS CLI нужен только тестам для изменения
+зашифрованного base.yaml; Composer расшифровывает vars самостоятельно.
+
+Перед запуском проверок установите SOPS CLI в VM.
 
 Убедитесь, что `docker ps -aq` и `docker image ls -q` в VM пусты. Вся система:
 

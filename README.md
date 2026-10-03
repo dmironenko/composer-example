@@ -21,9 +21,9 @@ host.yaml.example        # скопировать за пределы GitOps-р�
 test/                    # приёмка в одноразовой Linux VM
 ```
 
-Один каталог приложения — один Compose project. Prod использует base + prod,
+Один каталог приложения — один Compose project. Prod использует base,
 stage — base + stage. Отсутствие stage.yaml выключает приложение в stage.
-Основные изменения вносятся в base.yaml; prod.yaml оставлен для редких отличий.
+Основные изменения вносятся в base.yaml; stage.yaml содержит только отличия stage.
 `edge` здесь обычный namespace, Composer ничего не знает о назначении сервисов.
 
 ## Локальный запуск
@@ -64,7 +64,8 @@ git branch dev
 наблюдения за commits запустите `composer run --config ../composer.local.yaml`.
 На Ubuntu агент устанавливается через [composer install](../composer/docs/systemd.md).
 В примере `source.branches.prod: master`, `source.branches.stage: dev`.
-Имена веток произвольные, включая `main`. Для общей ветки остаётся `source.branch`.
+Имена веток произвольные, включая `main`. Для общей ветки укажите одинаковое
+значение у нужных окружений в `source.branches`.
 
 HTTP слушает `127.0.0.1:18080`, HTTPS — `127.0.0.1:18443`.
 Локальный сертификат выпускается встроенным локальным CA образа (`USE_LOCAL_CA=1`):
@@ -74,14 +75,14 @@ curl -ki https://localhost:18443/api/
 ```
 
 Ответ содержит `X-Composer-Environment: prod`. Cookie `composer_stage` со значением
-`secrets.stage_token` выбирает stage. Значение можно посмотреть через SOPS:
+`<secrets.stage_token>:stage` выбирает общий stage; `<secrets.stage_token>:dan` — персональный. Значение можно посмотреть через SOPS:
 
 ```sh
 export SOPS_AGE_KEY_FILE="$PWD/../composer-example.agekey"
 sops decrypt --extract '["secrets"]["stage_token"]' apps/edge/gateway/vars/base.yaml
 ```
 
-Передайте его в cookie браузера или `curl --cookie 'composer_stage=…'`.
+Передайте его в cookie браузера или `curl --cookie 'composer_stage=…:stage'`.
 Неверная или отсутствующая cookie выбирает prod. `/api/` доступен в обоих
 окружениях; `/` в stage возвращает ошибку, поскольку stage web отсутствует.
 Для проверки stage используйте отдельный профиль браузера: один origin означает
@@ -169,3 +170,31 @@ scale, revert, изоляцию окружений и настоящий HTTP-01
 Публичный сертификат Let's Encrypt в этой проверке не выпускается.
 [Полная приёмка](test/full/README.md) дополняет пример source builds, PostgreSQL,
 secrets, Git polling и перезагрузкой Ubuntu; тот же сценарий запускается на macOS.
+
+## Персональные окружения
+
+Добавьте одну запись в host YAML:
+
+```yaml
+source:
+  branches:
+    prod: master
+    stage: dev
+    dan: users/dan
+```
+
+`composer run` подхватит изменение на следующем проходе. Ветка `users/dan` должна
+существовать в GitOps-репозитории. Её `stage.yaml` включает нужные приложения;
+каждый namespace получает отдельную сеть, Compose volumes изолированы по окружению.
+Данные из prod автоматически не копируются.
+
+Шаблоны получают `.Environments`, создают подключения общего nginx ко всем
+окружениям и aliases `nginx-<окружение>`. Cookie `composer_stage=<секрет>:dan`
+выбирает персональный nginx. Неизвестное окружение с правильным секретом или
+недоступный backend возвращает 503, без fallback в prod. Неправильный секрет
+оставляет запрос в prod. Общий nginx/Certbot обслуживает тот же домен и сертификат.
+
+Добавление/удаление окружения может пересоздать общий nginx для изменения сетей;
+контейнеры приложений prod и остальных stage остаются прежними. Удалите запись
+`dan`, чтобы убрать его контейнеры. Volumes/images сохраняются; ошибка fetch
+или удалённая ветка сама по себе контейнеры не удаляет.

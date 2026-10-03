@@ -1,4 +1,14 @@
 {{- $compose := .Vars.compose -}}
+{{- $networks := dict "default" (dict "external" true "name" .Runtime.NetworkName) -}}
+{{- $routes := dict "default" (dict) -}}
+{{- with (get .Vars "route_namespace") -}}
+{{- $namespace := . -}}
+{{- range $.Environments -}}
+{{- $name := printf "env_%s" . -}}
+{{- $routes = merge $routes (dict $name (dict)) -}}
+{{- $networks = merge $networks (dict $name (dict "external" true "name" (network . $namespace))) -}}
+{{- end -}}
+{{- end -}}
 name: {{ quote .Runtime.ProjectName }}
 services:
 {{- range $name, $service := $compose.services }}
@@ -6,12 +16,14 @@ services:
 {{- $defaults := dict "restart" "always" -}}
 {{- if and $.Runtime.Image (not (get $service "image")) -}}
 {{- $defaults = merge $defaults (dict "image" $.Runtime.Image "pull_policy" "never") -}}
+{{- end -}}
+{{- with (get $.Vars "network_alias") -}}
+{{- $service = merge $service (dict "networks" (dict "default" (dict "aliases" (list (printf "%s-%s" . $.Env))))) -}}
+{{- end -}}
+{{- if get $.Vars "route_namespace" -}}
+{{- $service = merge (dict "networks" $routes) $service -}}
 {{- end }}
 {{ toYAML (merge $defaults $service) | indent 4 }}
-{{- end }}
-{{- $networks := dict "default" (dict "external" true "name" .Runtime.NetworkName) -}}
-{{- range $name, $target := (get .Vars "namespace_networks") -}}
-{{- $networks = merge $networks (dict $name (dict "external" true "name" (network $target.environment $target.namespace))) -}}
 {{- end }}
 networks:
 {{ toYAML (merge $networks (get $compose "networks")) | indent 2 }}

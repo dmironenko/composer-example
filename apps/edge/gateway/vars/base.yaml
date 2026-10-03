@@ -1,13 +1,6 @@
 tls:
     domain: localhost
     https_port: 18443
-namespace_networks:
-    prod_demo:
-        environment: prod
-        namespace: demo
-    stage_demo:
-        environment: stage
-        namespace: demo
 compose:
     services:
         nginx:
@@ -24,10 +17,6 @@ compose:
                 - ./configs/redirector.conf:/etc/nginx/conf.d/redirector.conf:ro
                 - letsencrypt:/etc/letsencrypt
                 - local_ca:/etc/local_ca
-            networks:
-                - default
-                - prod_demo
-                - stage_demo
             healthcheck:
                 test:
                     - CMD
@@ -42,19 +31,20 @@ compose:
         letsencrypt: {}
         local_ca: {}
 secrets:
-    stage_token: ENC[AES256_GCM,data:ZCd9qL9/preUl91E5dIHMJRnsL5RcVCvQnHhmcXFw2WEroKQ6Clx/KUNYShVDW1oWoAN1WkE6qGtRKaHwApYXw==,iv:hKKGCosBsNdFeXTrlK4f7ydgS/81SPKT17yeg3VMcNg=,tag:0vJk/Jr6Mb0hj8J55WNhEw==,type:str]
+    stage_token: ENC[AES256_GCM,data:KHjrjX4O9fvn7pwb3mPIKViTmkf+kga8mN124aWeC+6VdGZ0O6sj7sRhYmwFPNzxY9fw/vO1KgPW995OcThztA==,iv:8Xg2RyIHbZEiCWJ+NrFlWlwfgcC0kBc7+Yx9GHfWEa4=,tag:VVa5ZNTMrtHMNKklII4uNQ==,type:str]
+route_namespace: demo
 sops:
     age:
         - recipient: age1v00znz877vm9w47cyu0le28469cxkwvlwlfx4y4qgtk8vsky64hqukhrlu
           enc: |
             -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaQWw2b2krbUZhc3dycTJR
-            cDdPbzU1RmF1YVVnS29qNmJuQ2dhOHcwZ2kwClBrQ0JTeUFNVWRWbU9iVG9uRGg0
-            eGoweFNXOFpkQmtpKzAxa1JPTzd4cDgKLS0tIEZ0ZU1Id1g5SzFDNU8zcitkUStW
-            MnBJTUhEcmYxSUlRTnlxa3o3OU4xVWsKYUIs9R2r10Y8qwOzBNHvEySvd9xeh+Pv
-            ZPNmqINmBNRg+vD2uX1/IxIsG9M6L3cuT2VjKoGBdVVSJNmkpd2zaQ==
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWWWxRL0g1TU41NlJMb1lY
+            SnlNYnUxZTJDUVZrVXJqb2dUeEtSczBkelY0CkxyQWRVd2JNSTRxeFEzTzlVMDlh
+            dUs3TkdDOGIrRWxkTjl1dWJvZ3BnelUKLS0tIFQrMFhTdVZzV3M2TXNGV0lpSTRH
+            UFhMZ1VzOXp3TlZ2UE95OEE0SCtwSUEKcYy/8Yuqdfr+kUOuvAVlGNR2UqIPctpV
+            SRPKup5pTu7uoW28u+odNjJ2eXdP6afhVJ1a5X5b+q567RQQE6g+Tg==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-10-02T21:40:17Z"
-    mac: ENC[AES256_GCM,data:5Osl1Gykqgos47Q5quOivlgyPICGnCWgTDQRyUXrcoUxnix7W3BlVxbjsMPamNsqTmyBLFAna4+vXbcVZcf/+WjfZ9JvncXwYTcsgXOxI2br1T08JqCo3as3iFF3LUL/nkfoNbhTBPDv1hDO2AhA8mClBkOJEBgujLZDsDH7lMk=,iv:yIvdLVTWHebwxVoyJvxr9vgejPcpc6yubFMZcJN9fkE=,tag:d7WRbbj69rAb2eYbwjnloA==,type:str]
+    lastmodified: "2026-10-03T11:26:29Z"
+    mac: ENC[AES256_GCM,data:UYcAl4hYciQDUI/vWTniPkooEvq+tNNAIx0RpLNxqkAwlFMJojOQLUcYMw+CYVs7VEbTPuHXo8L/G4lC41ZlODjlYgy39xEEC8i7BcUrOooGJGb4KK4wEGZHY2TkAI4gtRchLU4YaBpuBsU8ltM+uVpjIiBEjOmV9u8C+uSF1XU=,iv:k1VLp2M+SMuD4VGc3jzFrOBPFuP6C/+44lKSMNtI5L4=,tag:WqB7i6jRvcLNXFQZM5asUQ==,type:str]
     encrypted_regex: ^secrets$
     version: 3.12.2

@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import re
 import ssl
 import subprocess
@@ -15,6 +16,27 @@ import yaml
 
 def run(*args: str) -> str:
     return subprocess.check_output(args, text=True).strip()
+
+
+def set_value(path: Path, keys: list[str], value, age_key: Path) -> None:
+    """Edit fixture vars, using SOPS to preserve authentication of encrypted files."""
+    values = yaml.safe_load(path.read_text())
+    encrypted = "sops" in values
+    env = dict(os.environ, SOPS_AGE_KEY_FILE=str(age_key))
+    if encrypted:
+        values = yaml.safe_load(subprocess.check_output(
+            ["sops", "decrypt", str(path)], text=True, env=env))
+    target = values
+    for key in keys[:-1]:
+        target = target.setdefault(key, {})
+    target[keys[-1]] = value
+    if encrypted:
+        subprocess.run(
+            ["sops", "set", "--value-stdin", str(path), "[" + json.dumps(keys[0]) + "]"],
+            input=json.dumps(values[keys[0]]), text=True, check=True, env=env,
+        )
+    else:
+        path.write_text(yaml.safe_dump(values))
 
 
 def main() -> None:
@@ -34,16 +56,24 @@ def main() -> None:
         )
         return json.loads(result.splitlines()[-1])
 
+    # These tests use one shared branch; keep the stage replica count independent.
+    stage_api = repo / "apps/demo/api/vars/stage.yaml"
+    set_value(stage_api, ["compose", "services", "api-http", "deploy", "replicas"],
+              1, host.parent / settings["age_key_file"])
+    run("git", "-C", str(repo), "add", str(stage_api))
+    if run("git", "-C", str(repo), "diff", "--cached", "--name-only"):
+        run("git", "-C", str(repo), "commit", "-qm", "test independent stage replicas")
+
     report = apply()
     projects = {p["name"]: p for p in report["projects"] if p["enabled"]}
     proxy_config = next(state.glob("deployments/prod/*/configs/*/configs/edge.conf"))
-    token = re.search(r'"([^"\s]+)" stage;', proxy_config.read_text())[1]
+    token = re.search(r'"([^"\s]+):stage" env_stage;', proxy_config.read_text())[1]
     encrypted = (repo / "apps/edge/gateway/vars/base.yaml").read_text()
     assert "ENC[AES256_GCM," in encrypted and token not in encrypted
     tls = ssl._create_unverified_context()  # Only the local bootstrap certificate.
 
     def request(path="/api/", cookie=None):
-        headers = {} if cookie is None else {"Cookie": f"composer_stage={cookie}"}
+        headers = {} if cookie is None else {"Cookie": f"composer_stage={cookie}:stage"}
         req = urllib.request.Request(
             f"https://localhost:{args.https_port}" + path, headers=headers
         )
@@ -122,10 +152,10 @@ def main() -> None:
 
     # Scale the API through deploy.replicas and wait for nginx DNS refresh.
     before = snapshot()
-    prod_file = repo / "apps/demo/api/vars/prod.yaml"
-    prod_file.write_text(
-        "compose:\n  services:\n    api-http:\n      deploy:\n        replicas: 3\n"
-    )
+    base_file = repo / "apps/demo/api/vars/base.yaml"
+    original = base_file.read_bytes()
+    set_value(base_file, ["compose", "services", "api-http", "deploy", "replicas"],
+              3, host.parent / settings["age_key_file"])
     commit("test three API replicas")
     scaled = snapshot()
     api = project("prod", "api")
@@ -138,7 +168,7 @@ def main() -> None:
             break
         time.sleep(1)
     assert len(instances) == 3, f"nginx reached {len(instances)} of 3 replicas"
-    prod_file.unlink()
+    base_file.write_bytes(original)
     commit("test scale back to one")
     assert len(snapshot()[api]) == 1
     print("PASS: deploy.replicas 1 -> 3 -> 1, DNS load balancing", flush=True)

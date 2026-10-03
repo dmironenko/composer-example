@@ -13,6 +13,8 @@ from pathlib import Path
 
 import yaml
 
+from verify import set_value
+
 PEBBLE = (
     "ghcr.io/letsencrypt/pebble@sha256:"
     "ddf230642b1a584f519f32e347de1b05a6e4c1f6c35c1863b33effeab5f78199"
@@ -110,8 +112,8 @@ def main() -> None:
 
     gateway = repo / "apps/edge/gateway"
     shutil.copyfile(fixture / "ca.pem", gateway / "configs/pebble-ca.pem")
-    override = gateway / "vars/prod.yaml"
-    values = yaml.safe_load(override.read_text()) if override.exists() else {}
+    base = gateway / "vars/base.yaml"
+    values = yaml.safe_load(base.read_text())
     values.setdefault("tls", {})["domain"] = "composer.test"
     compose = values.setdefault("compose", {})
     nginx = compose.setdefault("services", {}).setdefault("nginx", {})
@@ -119,8 +121,6 @@ def main() -> None:
         {
             "networks": {
                 "default": {"aliases": ["composer.test"]},
-                "prod_demo": {},
-                "stage_demo": {},
             },
             "volumes": [
                 "./configs:/etc/nginx/user_conf.d:ro",
@@ -136,7 +136,8 @@ def main() -> None:
         }
     )
     compose["volumes"] = {"acme_certificates": {}}
-    override.write_text(yaml.safe_dump(values))
+    for key in ("tls", "compose"):
+        set_value(base, [key], values[key], host.parent / settings["age_key_file"])
     run("git", "-C", str(repo), "add", "apps")
     run("git", "-C", str(repo), "commit", "-qm", "test local ACME")
     result = run(

@@ -2,18 +2,21 @@
 
 Сценарии запускаются в одноразовой копии GitOps на Linux или macOS.
 Для параллельного запуска задайте уникальную installation и свободные gateway
-ports в vars/prod.yaml. Передайте HTTPS-порт через --https-port в оба сценария.
+ports в vars/base.yaml через SOPS. Передайте HTTPS-порт через --https-port в оба сценария.
 Они делают commits/reverts в копии GitOps, выключают stage nginx, масштабируют API
-и перезапускают тестовый внешний nginx. `acme.py` оставляет тестовый override и CA-файл
+и перезапускают тестовый внешний nginx. `acme.py` оставляет тестовые настройки в base.yaml и CA-файл
 в копии репозитория; для повторного полного прогона используйте свежую VM.
 
-Нужны Git, Python 3.11+ с PyYAML, Docker, доступ в registry и Linux-бинарник Composer.
+Нужны Git, SOPS, Python 3.11+ с PyYAML, Docker, доступ в registry и Linux-бинарник Composer.
 На Ubuntu 24.04 пакеты можно установить так:
 
 ```sh
 sudo apt-get update
 sudo apt-get install -y docker.io git python3-yaml
 ```
+
+Установите SOPS CLI в VM: он нужен сценариям для изменения зашифрованных vars.
+Сам Composer работает без SOPS CLI.
 
 Скопируйте репозиторий без `.git`/`.venv` и приватный age key в VM отдельно.
 Например, `/var/tmp/composer-check/repo` и `/var/tmp/composer-check/age.txt`.
@@ -27,11 +30,10 @@ installation: ingress-check
 source:
   mode: local
   path: repo
-  branch: master
+  branches: {prod: master, stage: master}
   poll_interval: 2s
 state_dir: state
 age_key_file: age.txt
-environments: [prod, stage]
 docker:
   host: unix:///var/run/docker.sock
 ```
@@ -73,3 +75,16 @@ Docker проверяет создание всех сетей, volumes и се�
 Полный сценарий с source builds, PostgreSQL, secrets, SSH polling и перезагрузкой
 находится в [full/README.md](full/README.md). Он готовит собственные тестовые ключи
 и копию примера, затем поднимает весь стенд одной командой на пустом Docker.
+
+Персональные окружения проверяются отдельно на свежей копии с ветками master/dev
+и `source.branches: {prod: master, stage: dev}`:
+
+```sh
+python3 repo/test/environments.py /usr/local/bin/composer host.yaml
+```
+
+Сценарий добавляет `dan` без перезапуска агента, проверяет cookie-маршрутизацию,
+изоляцию сетей/volumes, config-only обновления, ошибочный host YAML и удалённую
+ветку. Затем удаляет окружение, проверяет сохранение данных и повторяет удаление
+после остановки агента. Не запускайте Docker-сценарии одновременно: они снимают
+контейнерные snapshots для проверки отсутствия перезапусков.

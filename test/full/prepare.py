@@ -97,7 +97,7 @@ AllowUsers root
     (database / "vars/stage.yaml").write_text("{}\n")
     (database / "configs/password.tmpl").write_text("{{ .Vars.secrets.password }}")
     (database / "configs/init.sql").write_text("CREATE TABLE acceptance (id integer PRIMARY KEY, value text NOT NULL);\nINSERT INTO acceptance VALUES (1, 'seeded');\n")
-    # Pre-encrypted alternative: the runtime VM needs neither SOPS nor age CLIs.
+    # Pre-encrypted alternatives exercise identical plaintext and secret rotation.
     gateway = repo / "apps/edge/gateway/vars/base.yaml"
     env = dict(os.environ, SOPS_AGE_KEY_FILE=str(root / "age.txt"))
     values = yaml.safe_load(subprocess.check_output(["sops", "decrypt", str(gateway)], text=True, env=env))
@@ -108,12 +108,12 @@ AllowUsers root
     run("git", "-C", str(repo), "commit", "-qm", "full acceptance fixture")
     auth = {"type": "ssh", "key_file": "client", "known_hosts_file": "known_hosts"}
     host = {"version": 1, "installation": "full-check", "source": {
-        "mode": "local", "path": "repo", "branch": "master", "poll_interval": "1s"},
-        "state_dir": "state", "age_key_file": "age.txt", "environments": ["prod", "stage"],
+        "mode": "local", "path": "repo", "branches": {"prod": "master", "stage": "master"}, "poll_interval": "1s"},
+        "state_dir": "state", "age_key_file": "age.txt",
         "build_auth": auth, "docker": {"host": "unix:///var/run/docker.sock"},
         "reconcile": {"parallelism": 4, "deploy_timeout": "5m"}}
     (root / "host.yaml").write_text(yaml.safe_dump(host))
-    remote = dict(host, source={"mode": "remote", "url": f"ssh://root@127.0.0.1:22222{GUEST}/repo", "branch": "master", "poll_interval": "1s", "auth": auth})
+    remote = dict(host, source={"mode": "remote", "url": f"ssh://root@127.0.0.1:22222{GUEST}/repo", "branches": {"prod": "master", "stage": "master"}, "poll_interval": "1s", "auth": auth})
     (root / "remote.yaml").write_text(yaml.safe_dump(remote))
     (root / "commits.json").write_text(json.dumps(commits))
     print(f"Prepared {root}; copy its contents to {GUEST} in a fresh VM")
