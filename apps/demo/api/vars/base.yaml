@@ -3,7 +3,7 @@ app:
 
 build:
   repository: https://github.com/hashicorp/http-echo.git
-  commit: "767bbd9c3d1905acb04891d5c5e208de17b34a71"
+  ref: "v1.0.0"
 
 compose:
   services:

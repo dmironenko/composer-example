@@ -83,7 +83,7 @@ git merge dev
 
 Local sources see commits without a push; remote sources need one. Config-only
 changes also trigger deployment. Revert a commit to roll back. For source builds,
-change `build.commit` in `base.yaml` and promote it with the same merge.
+change `build.ref` in `base.yaml` and promote it with the same merge.
 
 The shared ingress runs only from `master`. Test inner nginx routing on `dev`.
 
@@ -91,16 +91,18 @@ The shared ingress runs only from `master`. Test inner nginx routing on `dev`.
 
 `apps/demo/api/Dockerfile.tmpl` builds
 [http-echo](https://github.com/hashicorp/http-echo) from source. The builder stage
-runs `git clone`, checks out `build.commit` from `vars/base.yaml` via the
-`APP_COMMIT` build argument, and runs `go build`. The final BusyBox image
+runs `git clone`, checks out `build.ref` from `vars/base.yaml` via the
+`APP_REF` build argument, and runs `go build`. The final BusyBox image
 contains the compiled API and its license; Go, Git, and the source stay in the
 builder stage.
 
-Change `build.commit` or the Dockerfile on `dev`, verify stage, then merge into
+Change `build.ref` or the Dockerfile on `dev`, verify stage, then merge into
 `master`. Config-only changes reuse the image. Matching prod/stage build inputs
-share an image.
+share an image. `build.ref` accepts a commit SHA, tag, or branch; the example uses
+`v1.0.0`. Moving an existing tag or branch does not trigger a rebuild: change the
+ref in GitOps to deploy another version.
 
-Composer passes `APP_COMMIT` and an empty build context to Docker.
+Composer passes `APP_REF` and an empty build context to Docker.
 The Dockerfile handles the public HTTPS clone and checkout; host Git credentials
 are not forwarded into the build.
 
