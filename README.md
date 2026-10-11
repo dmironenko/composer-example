@@ -3,7 +3,7 @@
 A GitOps example for [Composer](https://github.com/dmironenko/composer).
 The ingress nginx handles TLS with Certbot and routes requests to prod or stage.
 The API runs in both environments and builds locally from `Dockerfile.tmpl`;
-the web app runs only in prod. Base images are pinned by digest.
+the web app runs only in prod.
 
 ```text
 apps/
@@ -182,7 +182,7 @@ See the [Composer secrets guide](https://github.com/dmironenko/composer/blob/mas
 
 ## Public TLS
 
-The pinned [nginx-certbot image](https://github.com/JonasAlfredsson/docker-nginx-certbot)
+The [nginx-certbot image](https://github.com/JonasAlfredsson/docker-nginx-certbot)
 issues and renews certificates and reloads nginx.
 
 Update `apps/ingress/nginx/vars/base.yaml`:

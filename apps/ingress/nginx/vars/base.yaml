@@ -7,7 +7,7 @@ app:
 compose:
   services:
     nginx:
-      image: jonasal/nginx-certbot:6.2.0-alpine@sha256:60a3ff8e236b2a3ee0daac57ba83b39110771ac48e9b58d80bc3a357bbec4a28
+      image: jonasal/nginx-certbot:6.2.0-alpine
       environment:
         CERTBOT_EMAIL: ops@example.invalid
         USE_LOCAL_CA: "1"
