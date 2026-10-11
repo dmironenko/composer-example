@@ -91,8 +91,9 @@ The shared ingress runs only from `master`. Test inner nginx routing on `dev`.
 
 `apps/demo/api/Dockerfile.tmpl` builds
 [http-echo](https://github.com/hashicorp/http-echo) from source. The builder stage
-runs `git clone`, checks out `build.tag` from `vars/base.yaml` via the
-`BUILD_TAG` build argument, and runs `go build`. The final BusyBox image
+reads `.Vars.build.repository` and `.Vars.build.tag` through Go templates,
+runs `git clone`, checks out the selected version, and runs `go build`.
+The final BusyBox image
 contains the compiled API and its license; Go, Git, and the source stay in the
 builder stage.
 
@@ -102,7 +103,7 @@ share an image. `build.tag` accepts a commit SHA, tag, or branch; the example us
 `v1.0.0`. Moving an existing tag or branch does not trigger a rebuild: change the
 tag in GitOps to deploy another version.
 
-Composer passes `BUILD_TAG` and an empty build context to Docker.
+Composer passes the rendered Dockerfile and an empty build context to Docker.
 The Dockerfile handles the public HTTPS clone and checkout; host Git credentials
 are not forwarded into the build.
 
