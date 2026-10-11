@@ -2,13 +2,13 @@
 
 A GitOps example for [Composer](https://github.com/dmironenko/composer).
 The ingress nginx handles TLS with Certbot and routes requests to prod or stage.
-The API runs in both environments; the web app runs only in prod. Images are pinned
-by digest.
+The API runs in both environments and builds locally from `Dockerfile.tmpl`;
+the web app runs only in prod. Base images are pinned by digest.
 
 ```text
 apps/
   demo/
-    api/                   # base.yaml, stage.yaml, message template
+    api/                   # vars, message template, Dockerfile.tmpl, src/start.sh
     web/                   # base.yaml, message template
     nginx/                 # base.yaml, stage.yaml, nginx template
   ingress/
@@ -86,6 +86,21 @@ changes also trigger deployment. Revert a commit to roll back. For source builds
 change `build.commit` in `base.yaml` and promote it with the same merge.
 
 The shared ingress runs only from `master`. Test inner nginx routing on `dev`.
+
+## Custom Dockerfile
+
+`apps/demo/api/Dockerfile.tmpl` copies `src/start.sh` into a BusyBox image.
+`build.repository` and `build.commit` in `vars/base.yaml` select the source tree;
+`COPY` paths start at that repository's root. This demo keeps its source in the
+same repository. Your app can point to a separate source repository.
+For private sources, configure
+[`build_auth`](https://github.com/dmironenko/composer/blob/master/docs/builds.md#доступ-к-приватным-исходникам)
+in the host YAML before running `apply`.
+
+After changing `src/start.sh`, commit and push it, then set `build.commit` to that
+full commit SHA in a second commit. Dockerfile changes are read directly from the
+environment's GitOps branch. Composer reuses the built image for config-only
+changes and rollbacks. Prod and stage share the image when their build inputs match.
 
 ## Networks and personal environments
 
