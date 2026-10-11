@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Intentionally public demo age identity; never use for real secrets"
+paths = ['''(^|/)demo\.agekey$''']

@@ -31,4 +31,20 @@ compose:
     local_ca: {}
 
 secrets:
-  stage_token: composer-example-test
+  stage_token: ENC[AES256_GCM,data:HqCSi3Fq/A7F75xEw1h5drFmJkfU,iv:eF0pWRpvHZ+F/PyhASSmKyS8ZwOeJLvCkoko3a7bKE0=,tag:LJ9OgvtFpClMVbJW8EfMjA==,type:str]
+
+sops:
+  age:
+    - recipient: age1crff86ca2wnmzcwysrdd8q4m8twqs3zh77v30zt74tku6ejss3zsmyuz0w
+      enc: |
+        -----BEGIN AGE ENCRYPTED FILE-----
+        YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0anFUckdFM25ISzBlcUNv
+        NXJmdXhWRG9sSmwzNTNCVVduamFlNzd6UHhFCktFR3BJditOblBYYUNDak51WDZl
+        YUVCTTllelZ0NndRL2E1L0xGNDZ4WW8KLS0tIHdKQjVBWEJybW5aWHhkQnRkdmtr
+        UXd2MzJLSHNCQ2pjOHNwU3IxSWVIcFkKeRuWbGZ0U89PlRF/Rpi5CunXqIDNbcQD
+        Qs+aDZVQaO9Go1Q5v/50uhYRT5cDht4c11MrCR0Hfm2HinpafU/03w==
+        -----END AGE ENCRYPTED FILE-----
+  lastmodified: "2026-10-11T18:42:34Z"
+  mac: ENC[AES256_GCM,data:soFadwmLwQCWnpZrKOnXCCBEaOS4Q5xx6z8SHR9fcyI/afuF8P1d/5DPfBOd+SNmzrldteWpBDk1EUbXPzdkw0Z0tP0W4T/XAcW5FBKGUWVuH4M40XFfcXdVUvEhUQy4fDNYoEvUmMq5lNLjiny4eucnsHJc1JkbEk/D11QPIr8=,iv:SOXBRVPKAiDwq8I3L7KyEoKV0nrR4fy7DGdFcu4Iiwk=,tag:X59ZsnAs/hT6fUaB5oYctg==,type:str]
+  encrypted_regex: ^secrets$
+  version: 3.12.2

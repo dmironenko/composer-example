@@ -13,10 +13,11 @@ apps/
     nginx/                 # base.yaml, stage.yaml, nginx template
   ingress/
     nginx/                 # nginx + Certbot
-      vars/base.yaml       # TLS settings and a public demo routing token
+      vars/base.yaml       # TLS settings and an encrypted demo routing token
       configs/
 templates/compose.yaml.tmpl
 host.yaml.example          # copy outside this repository
+demo.agekey                # public demo identity; never use for real secrets
 ```
 
 `prod` reads `base.yaml`; other environments add `stage.yaml` overrides.
@@ -34,17 +35,19 @@ git clone --branch master https://github.com/dmironenko/composer-example.git
 cd composer-example
 git branch dev master
 cp host.yaml.example ../composer.local.yaml
+install -m 600 demo.agekey ../composer-example.agekey
 ../composer/bin/composer validate --config ../composer.local.yaml
 ../composer/bin/composer apply --config ../composer.local.yaml --wait --timeout 15m
 ```
 
 Skip `git branch dev master` if `dev` already exists. Host configuration paths
 are relative to the host YAML file. Composer reads committed snapshots.
+The demo key and token are public; encryption here demonstrates the SOPS workflow.
 
 The ingress binds `127.0.0.1:18080` and `127.0.0.1:18443`. For another copy, use a
 unique `installation` and `state_dir`, and choose free ports in
 `apps/ingress/nginx/vars/base.yaml`, including `tls.https_port`. Commit port changes
-to both branches.
+to both branches. Use SOPS to edit this encrypted file, as shown below.
 
 Composer creates networks and volumes; nginx-certbot creates a local certificate.
 Check both environments, then start polling:
@@ -121,30 +124,46 @@ Adding or removing an environment can briefly interrupt ingress while its networ
 attachments update. Removing the entry removes that environment's containers but
 keeps volumes and images. Failed fetches or missing branches preserve deployments.
 
-## Use your own routing secret
+## Secrets
 
-Replace the public token before exposing the stack. With age, SOPS, and OpenSSL installed:
+`secrets.stage_token` is encrypted with SOPS and age at the bottom of
+`apps/ingress/nginx/vars/base.yaml`. Composer reads the copied key through
+`age_key_file`, decrypts the token and passes it to nginx's template as
+`.Secrets.stage_token`. The rest of the YAML stays readable.
+
+With SOPS installed, edit the file, including its unencrypted fields:
+
+```sh
+export SOPS_AGE_KEY_FILE="$PWD/../composer-example.agekey"
+sops edit apps/ingress/nginx/vars/base.yaml
+```
+
+Commit the encrypted result. To read the demo token:
+
+```sh
+sops decrypt --extract '["secrets"]["stage_token"]' apps/ingress/nginx/vars/base.yaml
+```
+
+Before using the stack on a server, replace both the public key and token.
+With age, SOPS, and OpenSSL installed:
 
 ```sh
 umask 077
-age-keygen -o ../composer-example.agekey
+age-keygen -o ../composer-private.agekey
 export SOPS_AGE_KEY_FILE="$PWD/../composer-example.agekey"
-sops encrypt --in-place --age "$(age-keygen -y "$SOPS_AGE_KEY_FILE")" \
-  --encrypted-regex '^secrets$' apps/ingress/nginx/vars/base.yaml
+sops rotate --in-place \
+  --add-age "$(age-keygen -y ../composer-private.agekey)" \
+  --rm-age "$(age-keygen -y demo.agekey)" \
+  apps/ingress/nginx/vars/base.yaml
+export SOPS_AGE_KEY_FILE="$PWD/../composer-private.agekey"
 composer_token=$(openssl rand -hex 32)
 printf '"%s"' "$composer_token" | sops set --value-stdin \
   apps/ingress/nginx/vars/base.yaml '["secrets"]["stage_token"]'
 unset composer_token
 ```
 
-Add `age_key_file: composer-example.agekey` to `../composer.local.yaml`. Commit the
-encrypted file and keep the private key outside Git. Use
-`sops apps/ingress/nginx/vars/base.yaml` for all later edits. To read the token:
-
-```sh
-sops decrypt --extract '["secrets"]["stage_token"]' apps/ingress/nginx/vars/base.yaml
-```
-
+Set `age_key_file: composer-private.agekey` in `../composer.local.yaml` and commit
+the encrypted file. Keep your private key outside Git. Use SOPS for later edits.
 See the [Composer secrets guide](https://github.com/dmironenko/composer/blob/master/docs/secrets.md).
 
 ## Public TLS
@@ -152,7 +171,7 @@ See the [Composer secrets guide](https://github.com/dmironenko/composer/blob/mas
 The pinned [nginx-certbot image](https://github.com/JonasAlfredsson/docker-nginx-certbot)
 issues and renews certificates and reloads nginx.
 
-Update `apps/ingress/nginx/vars/base.yaml` through SOPS if encrypted:
+Update `apps/ingress/nginx/vars/base.yaml` through SOPS:
 
 - `tls.domain`: your domain; `tls.https_port: 443`.
 - `compose.services.nginx.environment.CERTBOT_EMAIL`: your email.
