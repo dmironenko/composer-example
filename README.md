@@ -92,7 +92,7 @@ The shared ingress runs only from `master`. Test inner nginx routing on `dev`.
 `apps/demo/api/Dockerfile.tmpl` builds
 [http-echo](https://github.com/hashicorp/http-echo) from source. The builder stage
 runs `git clone`, checks out `build.commit` from `vars/base.yaml` via the
-`COMPOSER_COMMIT` build argument, and runs `go build`. The final BusyBox image
+`APP_COMMIT` build argument, and runs `go build`. The final BusyBox image
 contains the compiled API and its license; Go, Git, and the source stay in the
 builder stage.
 
@@ -100,7 +100,7 @@ Change `build.commit` or the Dockerfile on `dev`, verify stage, then merge into
 `master`. Config-only changes reuse the image. Matching prod/stage build inputs
 share an image.
 
-Composer passes `COMPOSER_COMMIT` and an empty build context to Docker.
+Composer passes `APP_COMMIT` and an empty build context to Docker.
 The Dockerfile handles the public HTTPS clone and checkout; host Git credentials
 are not forwarded into the build.
 
