@@ -1,4 +1,5 @@
-message: "api: production"
+app:
+  message: "api: production"
 
 compose:
   services:

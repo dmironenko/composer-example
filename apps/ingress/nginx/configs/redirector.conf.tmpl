@@ -4,6 +4,6 @@ server {
         root /var/www/letsencrypt;
     }
     location / {
-        return 308 https://{{ .Vars.tls.domain }}:{{ .Vars.tls.https_port }}$request_uri;
+        return 308 https://{{ .Vars.app.tls.domain }}:{{ .Vars.app.tls.https_port }}$request_uri;
     }
 }

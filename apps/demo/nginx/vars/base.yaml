@@ -1,5 +1,6 @@
-config_revision: v1
-network_alias: nginx
+app:
+  config_revision: v1
+  network_alias: nginx
 
 compose:
   services:

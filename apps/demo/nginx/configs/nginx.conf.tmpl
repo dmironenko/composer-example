@@ -12,7 +12,7 @@ http {
     server {
         listen 8080;
         add_header X-Composer-Environment {{ quote .Env }} always;
-        add_header X-Config-Revision {{ quote .Vars.config_revision }} always;
+        add_header X-Config-Revision {{ quote .Vars.app.config_revision }} always;
         location = /healthz { return 200 'ok\n'; }
         location /api/ {
             proxy_pass http://api/;

@@ -1,9 +1,8 @@
 app:
   route_namespace: demo
-
-tls:
-  domain: localhost
-  https_port: 18443
+  tls:
+    domain: localhost
+    https_port: 18443
 
 compose:
   services:
@@ -44,7 +43,7 @@ sops:
         UXd2MzJLSHNCQ2pjOHNwU3IxSWVIcFkKeRuWbGZ0U89PlRF/Rpi5CunXqIDNbcQD
         Qs+aDZVQaO9Go1Q5v/50uhYRT5cDht4c11MrCR0Hfm2HinpafU/03w==
         -----END AGE ENCRYPTED FILE-----
-  lastmodified: "2026-10-11T18:42:34Z"
-  mac: ENC[AES256_GCM,data:soFadwmLwQCWnpZrKOnXCCBEaOS4Q5xx6z8SHR9fcyI/afuF8P1d/5DPfBOd+SNmzrldteWpBDk1EUbXPzdkw0Z0tP0W4T/XAcW5FBKGUWVuH4M40XFfcXdVUvEhUQy4fDNYoEvUmMq5lNLjiny4eucnsHJc1JkbEk/D11QPIr8=,iv:SOXBRVPKAiDwq8I3L7KyEoKV0nrR4fy7DGdFcu4Iiwk=,tag:X59ZsnAs/hT6fUaB5oYctg==,type:str]
+  lastmodified: "2026-10-11T18:45:11Z"
+  mac: ENC[AES256_GCM,data:6453RBI0pZmZNAx6LwDZLaf80tBSdVxbbM3iNXPpjvvWHR6fK92H1Atz8lb9BBaIhxaRftVgvc2stZBikYDOpZTAuEcCgH/vHcDx97NEtNGyG2HnPtVVLb0gMZOfXokDKDsuapDEiDYg6emni03N0lr4LKJPMdpAt5BC6JObIkU=,iv:09jupFCZgREcLIK8ssnprzjke8kfpgnEB9X2sVOlxaE=,tag:ORq1DZ6YKa8bg2/sApdSBA==,type:str]
   encrypted_regex: ^secrets$
   version: 3.12.2

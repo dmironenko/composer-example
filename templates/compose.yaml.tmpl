@@ -1,5 +1,6 @@
 {{- $compose := .Vars.compose -}}
-{{- $routeNamespace := get (get .Vars "app") "route_namespace" -}}
+{{- $app := get .Vars "app" -}}
+{{- $routeNamespace := get $app "route_namespace" -}}
 {{- $networks := dict "default" (dict "external" true "name" .Runtime.NetworkName) -}}
 {{- $routes := dict "default" (dict) -}}
 {{- with $routeNamespace -}}
@@ -18,7 +19,7 @@ services:
 {{- if and $.Runtime.Image (not (get $service "image")) -}}
 {{- $defaults = merge $defaults (dict "image" $.Runtime.Image "pull_policy" "never") -}}
 {{- end -}}
-{{- with (get $.Vars "network_alias") -}}
+{{- with (get $app "network_alias") -}}
 {{- $service = merge $service (dict "networks" (dict "default" (dict "aliases" (list (printf "%s-%s" . $.Env))))) -}}
 {{- end -}}
 {{- if $routeNamespace -}}

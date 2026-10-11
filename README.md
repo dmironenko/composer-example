@@ -21,7 +21,8 @@ demo.agekey                # public demo identity; never use for real secrets
 ```
 
 `prod` reads `base.yaml`; other environments add `stage.yaml` overrides.
-Missing `stage.yaml` disables an app outside prod.
+Missing `stage.yaml` disables an app outside prod. Keep app-specific settings
+under `app`, Compose settings under `compose`, and encrypted values under `secrets`.
 
 ## Local quick start
 
@@ -46,7 +47,7 @@ The demo key and token are public; encryption here demonstrates the SOPS workflo
 
 The ingress binds `127.0.0.1:18080` and `127.0.0.1:18443`. For another copy, use a
 unique `installation` and `state_dir`, and choose free ports in
-`apps/ingress/nginx/vars/base.yaml`, including `tls.https_port`. Commit port changes
+`apps/ingress/nginx/vars/base.yaml`, including `app.tls.https_port`. Commit port changes
 to both branches. Use SOPS to edit this encrypted file, as shown below.
 
 Composer creates networks and volumes; nginx-certbot creates a local certificate.
@@ -173,7 +174,7 @@ issues and renews certificates and reloads nginx.
 
 Update `apps/ingress/nginx/vars/base.yaml` through SOPS:
 
-- `tls.domain`: your domain; `tls.https_port: 443`.
+- `app.tls.domain`: your domain; `app.tls.https_port: 443`.
 - `compose.services.nginx.environment.CERTBOT_EMAIL`: your email.
 - `compose.services.nginx.environment.USE_LOCAL_CA: "0"`.
 - `compose.services.nginx.ports`: `["80:80", "443:443"]`.
