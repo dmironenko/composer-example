@@ -3,15 +3,15 @@ FROM golang:1.26-alpine AS builder
 RUN apk add --no-cache git
 WORKDIR /src
 
-ARG APP_REF
+ARG BUILD_TAG
 RUN git clone {{ quote .Vars.build.repository }} . \
-    && git checkout "$APP_REF" \
+    && git checkout "$BUILD_TAG" \
     && CGO_ENABLED=0 go build -trimpath -o /out/api .
 
 FROM busybox:1.37.0
 
-ARG APP_REF
-LABEL org.opencontainers.image.revision=$APP_REF
+ARG BUILD_TAG
+LABEL org.opencontainers.image.revision=$BUILD_TAG
 
 COPY --from=builder /out/api /usr/local/bin/api
 COPY --from=builder /src/LICENSE /usr/share/licenses/http-echo/LICENSE
