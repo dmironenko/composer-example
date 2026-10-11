@@ -1,5 +1,6 @@
 config_revision: v1
 network_alias: nginx
+
 compose:
   services:
     nginx:
@@ -8,7 +9,7 @@ compose:
       deploy:
         replicas: 1
       healthcheck:
-        test: [CMD, wget, -qO-, 'http://127.0.0.1:8080/healthz']
+        test: wget -qO- http://127.0.0.1:8080/healthz
         interval: 2s
         timeout: 1s
         retries: 10

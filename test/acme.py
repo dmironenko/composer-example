@@ -33,6 +33,7 @@ def main() -> None:
     args = parser.parse_args()
     host = args.host.resolve()
     settings = yaml.safe_load(host.read_text())
+    age_key = host.parent / settings["age_key_file"] if settings.get("age_key_file") else None
     repo = (host.parent / settings["source"]["path"]).resolve()
     # Create the namespace networks and gateway before attaching the test CA.
     report = json.loads(
@@ -137,7 +138,7 @@ def main() -> None:
     )
     compose["volumes"] = {"acme_certificates": {}}
     for key in ("tls", "compose"):
-        set_value(base, [key], values[key], host.parent / settings["age_key_file"])
+        set_value(base, [key], values[key], age_key)
     run("git", "-C", str(repo), "add", "apps")
     run("git", "-C", str(repo), "commit", "-qm", "test local ACME")
     result = run(

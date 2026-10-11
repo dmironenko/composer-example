@@ -2,12 +2,13 @@
 
 Сценарии запускаются в одноразовой копии GitOps на Linux или macOS.
 Для параллельного запуска задайте уникальную installation и свободные gateway
-ports в vars/base.yaml через SOPS. Передайте HTTPS-порт через --https-port в оба сценария.
+ports в vars/base.yaml. Передайте HTTPS-порт через --https-port в оба сценария.
 Они делают commits/reverts в копии GitOps, выключают stage nginx, масштабируют API
 и перезапускают тестовый внешний nginx. `acme.py` оставляет тестовые настройки в base.yaml и CA-файл
 в копии репозитория; для повторного полного прогона используйте свежую VM.
 
-Нужны Git, SOPS, Python 3.11+ с PyYAML, Docker, доступ в registry и Linux-бинарник Composer.
+Нужны Git, Python 3.11+ с PyYAML (`pip install -r test/requirements.txt`), Docker,
+доступ в registry и бинарник Composer для вашей ОС.
 На Ubuntu 24.04 пакеты можно установить так:
 
 ```sh
@@ -15,14 +16,12 @@ sudo apt-get update
 sudo apt-get install -y docker.io git python3-yaml
 ```
 
-Установите SOPS CLI в VM: он нужен сценариям для изменения зашифрованных vars.
-Сам Composer работает без SOPS CLI.
+Обычный пример использует открытый тестовый токен. Для копии с зашифрованными vars
+дополнительно установите SOPS CLI, скопируйте age key отдельно от репозитория
+и задайте `age_key_file` в host YAML. Сам Composer работает без SOPS CLI.
 
-Скопируйте репозиторий без `.git`/`.venv` и приватный age key в VM отдельно.
-Например, `/var/tmp/composer-check/repo` и `/var/tmp/composer-check/age.txt`.
-Ключ должен соответствовать зашифрованному vars/base.yaml; первоначальная
-настройка описана в [README](../README.md). Каталог проверки закройте режимом
-0700, ключ — 0600. Host YAML `/var/tmp/composer-check/host.yaml`:
+Скопируйте репозиторий без `.git`/`.venv` в `/var/tmp/composer-check/repo`.
+Каталог проверки закройте режимом 0700. Host YAML `/var/tmp/composer-check/host.yaml`:
 
 ```yaml
 version: 1
@@ -33,14 +32,13 @@ source:
   branches: {prod: master, stage: master}
   poll_interval: 2s
 state_dir: state
-age_key_file: age.txt
 docker:
   host: unix:///var/run/docker.sock
 ```
 
 В копии репозитория выполните `git init -b master`, настройте локальные
 `user.name`/`user.email` для тестовых commits и сделайте первый commit.
-Запускайте команды от пользователя с доступом к Docker, ключу и state_dir.
+Запускайте команды от пользователя с доступом к Docker и state_dir.
 Из `/var/tmp/composer-check`:
 
 ```sh

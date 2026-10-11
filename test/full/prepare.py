@@ -6,7 +6,6 @@ import os
 import secrets
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import yaml
@@ -32,7 +31,7 @@ def main():
         example, repo,
         ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", ".ruff_cache", ".DS_Store"),
     )
-    subprocess.run([sys.executable, str(repo / "scripts/configure.py"), str(root / "age.txt")], check=True)
+    subprocess.run(["age-keygen", "-o", str(root / "age.txt")], check=True, capture_output=True)
     recipient = run("age-keygen", "-y", str(root / "age.txt"))
 
     def encrypted(values):
@@ -99,8 +98,9 @@ AllowUsers root
     (database / "configs/init.sql").write_text("CREATE TABLE acceptance (id integer PRIMARY KEY, value text NOT NULL);\nINSERT INTO acceptance VALUES (1, 'seeded');\n")
     # Pre-encrypted alternatives exercise identical plaintext and secret rotation.
     gateway = repo / "apps/edge/gateway/vars/base.yaml"
-    env = dict(os.environ, SOPS_AGE_KEY_FILE=str(root / "age.txt"))
-    values = yaml.safe_load(subprocess.check_output(["sops", "decrypt", str(gateway)], text=True, env=env))
+    values = yaml.safe_load(gateway.read_text())
+    values["secrets"]["stage_token"] = secrets.token_hex(32)
+    gateway.write_text(encrypted(values))
     (root / "gateway-reencrypted.yaml").write_text(encrypted(values))
     values["secrets"]["stage_token"] = secrets.token_hex(32)
     (root / "gateway-rotated.yaml").write_text(encrypted(values))

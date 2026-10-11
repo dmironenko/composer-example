@@ -1,200 +1,199 @@
 # Composer example
 
-GitOps-пример: внешний nginx принимает HTTP/HTTPS, выбирает prod или stage по cookie
-и передаёт запрос отдельному nginx окружения. API работает в обоих окружениях,
-web — только в prod. Все образы закреплены digest.
+A runnable GitOps repository for [Composer](https://github.com/dmironenko/composer).
+An outer nginx terminates TLS and routes requests to independent production and
+stage nginx instances. The API runs in both environments; the web app runs only in
+production. Container images are pinned by digest.
 
 ```text
 apps/
   demo/
-    api/                 # vars/base.yaml, stage.yaml, configs/message.txt.tmpl
-    web/                 # vars/base.yaml, configs/message.txt.tmpl
-    nginx/               # vars/base.yaml, stage.yaml, configs/nginx.conf.tmpl
+    api/                   # base.yaml, stage.yaml, message template
+    web/                   # base.yaml, message template
+    nginx/                 # base.yaml, stage.yaml, nginx template
   edge/
-    gateway/             # nginx + Certbot в готовом образе
-      vars/base.yaml     # настройки TLS и зашифрованный secrets.stage_token
+    gateway/               # nginx + Certbot
+      vars/base.yaml       # TLS settings and a public demo routing token
       configs/
 templates/compose.yaml.tmpl
-scripts/configure.py
-.sops.yaml               # только публичный age recipient
-host.yaml.example        # скопировать за пределы GitOps-репозитория
-test/                    # приёмка в одноразовой Linux VM
+host.yaml.example          # copy outside this repository
+test/                      # disposable acceptance fixtures
 ```
 
-Один каталог приложения — один Compose project. Prod использует base,
-stage — base + stage. Отсутствие stage.yaml выключает приложение в stage.
-Основные изменения вносятся в base.yaml; stage.yaml содержит только отличия stage.
-`edge` здесь обычный namespace, Composer ничего не знает о назначении сервисов.
+One directory is one Compose project. `prod` reads `base.yaml`; other environments
+read `base.yaml` plus `stage.yaml`. Missing `stage.yaml` disables an app outside
+production. Put shared settings in `base.yaml` and only differences in `stage.yaml`.
 
-## Локальный запуск
+## Local quick start
 
-Нужны Docker Engine или Docker Desktop, собранный `../composer/bin/composer`,
-Git, Python 3.11+, SOPS и age. Команды выполняются из этого репозитория.
-
-При первом использовании создайте свой ключ вне GitOps и новый секрет cookie:
+Requires Git, Go 1.26.3 or newer, and Docker Engine or Docker Desktop. Clone the
+repositories side by side into a new directory:
 
 ```sh
-python3 -m venv .venv
-.venv/bin/pip install -r scripts/requirements.txt
-.venv/bin/python scripts/configure.py ../composer-example.agekey
+git clone https://github.com/dmironenko/composer.git
+git clone https://github.com/dmironenko/composer-example.git
+(cd composer && go build -o bin/composer ./cmd/composer)
+cd composer-example
+git branch dev master
 cp host.yaml.example ../composer.local.yaml
-```
-
-Если host YAML уже настроен, сохраните его и добавьте `age_key_file` с путём
-к ключу. Пути в host YAML разрешаются относительно самого host YAML.
-`configure.py` заменяет демонстрационный блок `secrets` и шифрует его для вашего
-ключа; это первоначальная настройка, для обычных правок используйте SOPS.
-
-Composer читает только committed branch. Для нового репозитория:
-
-```sh
-git init -b master
-git add .
-git commit -m 'Configure Composer example'
-git branch dev
-```
-
-После подготовки Git и credentials вся инфраструктура поднимается одной командой:
-
-```sh
+../composer/bin/composer validate --config ../composer.local.yaml
 ../composer/bin/composer apply --config ../composer.local.yaml --wait --timeout 15m
 ```
 
-Сети, volumes и начальный сертификат создаются автоматически. Для постоянного
-наблюдения за commits запустите `composer run --config ../composer.local.yaml`.
-На Ubuntu агент устанавливается через [composer install](../composer/docs/systemd.md).
-В примере `source.branches.prod: master`, `source.branches.stage: dev`.
-Имена веток произвольные, включая `main`. Для общей ветки укажите одинаковое
-значение у нужных окружений в `source.branches`.
+If a local `dev` branch already exists, use it instead of creating it again. The
+example has a public test token, `composer-example-test`; age, SOPS, and Python are
+not needed to start it. Composer reads committed branches, so commit edits before
+applying them. Host configuration paths are relative to the host YAML file.
 
-HTTP слушает `127.0.0.1:18080`, HTTPS — `127.0.0.1:18443`.
-Локальный сертификат выпускается встроенным локальным CA образа (`USE_LOCAL_CA=1`):
+The gateway binds only `127.0.0.1:18080` and `127.0.0.1:18443`. Before running another
+copy, choose a unique `installation` and `state_dir` in host YAML and free ports in
+`apps/edge/gateway/vars/base.yaml`, including `tls.https_port`. Commit those port
+changes to both selected branches. Containers, networks, and named volumes are
+isolated by installation and environment; published ports must still be distinct.
+
+Networks, volumes, and a local development certificate are created automatically:
 
 ```sh
 curl -ki https://localhost:18443/api/
+curl -ki --cookie 'composer_stage=composer-example-test:stage' https://localhost:18443/api/
+../composer/bin/composer run --config ../composer.local.yaml
 ```
 
-Ответ содержит `X-Composer-Environment: prod`. Cookie `composer_stage` со значением
-`<secrets.stage_token>:stage` выбирает общий stage; `<secrets.stage_token>:dan` — персональный. Значение можно посмотреть через SOPS:
+The first request returns `X-Composer-Environment: prod`; the second selects stage.
+`/api/` works in both environments. `/` returns an error in stage because no stage
+web app is configured. Invalid or missing cookies select prod; an unavailable
+selected environment returns an error, without falling back to prod.
 
-```sh
-export SOPS_AGE_KEY_FILE="$PWD/../composer-example.agekey"
-sops decrypt --extract '["secrets"]["stage_token"]' apps/edge/gateway/vars/base.yaml
-```
+Use a separate browser profile for stage: the same origin shares cookies and local
+storage. The routing cookie is not application authentication. The local certificate
+is for development; `curl -k` skips certificate verification only for this example.
 
-Передайте его в cookie браузера или `curl --cookie 'composer_stage=…:stage'`.
-Неверная или отсутствующая cookie выбирает prod. `/api/` доступен в обоих
-окружениях; `/` в stage возвращает ошибку, поскольку stage web отсутствует.
-Для проверки stage используйте отдельный профиль браузера: один origin означает
-общие cookies и browser storage. Cookie маршрутизации не заменяет авторизацию приложения.
+## Change an application
 
-## Сети и обновления
-
-```mermaid
-flowchart LR
-    Client -->|HTTP / HTTPS| Edge[nginx + Certbot]
-    Edge -->|обычный запрос| Prod[nginx prod]
-    Edge -->|секретная cookie| Stage[nginx stage]
-    Prod --> ProdApps[API + web: сеть demo/prod]
-    Stage --> StageApps[API: сеть demo/stage]
-```
-
-Nginx и приложения каждого окружения подключены только к своей namespace-сети.
-Внешний nginx явно подключён к сетям demo/prod и demo/stage через `namespace_networks`
-общего шаблона. Helper `network "stage" "demo"` возвращает имя сети текущей
-installation; сеть должна принадлежать включённому приложению или существовать
-заранее. Оба nginx включены, поэтому Composer создаёт обе сети до запуска workers.
-
-У внутренних nginx и приложений нет host ports и container_name. Масштабирование
-задаётся через `compose.services.<name>.deploy.replicas`. Nginx обновляет адреса
-backend через Docker DNS. Публичные порты закреплены только за внешним nginx.
-При недоступном stage возвращается ошибка без перехода в prod.
-
-Composer читает весь GitOps-снимок отдельно для каждого окружения: Dockerfile,
-configs, vars и общий Compose template. Изменения в `dev` не затрагивают prod.
-Основные настройки по-прежнему пишутся в `base.yaml`; `stage.yaml` включает
-приложение в stage и содержит только отличия окружения.
+Keep `composer run` running in another terminal:
 
 ```sh
 git switch dev
-# Изменить base.yaml, Dockerfile.tmpl или configs, затем commit.
+# Edit apps/demo/api/vars/base.yaml, a config template, or a Dockerfile.
 git add apps templates
-git commit -m 'Update app'
-# Проверить stage через cookie, затем перенести проверенные изменения:
+git commit -m 'Update API'
+# Inspect stage, then promote the change:
 git switch master
 git merge dev
 ```
 
-Для remote source нужен push соответствующей ветки. Локальный source видит commit
-без push. Откат — `git revert` в ветке соответствующего окружения. Config-only
-commit пересоздаёт затронутый project даже при прежнем image. При одинаковых
-исходниках и отрендеренном Dockerfile prod переиспользует собранный в stage образ.
-Для этого `build.commit` меняется в `base.yaml` ветки dev, а отдельный override
-commit в stage.yaml не требуется.
+The local source sees commits without a push. Remote sources require a push.
+Revert a commit in the corresponding branch to roll back. Config-only changes
+are applied even when an image has not changed. For source builds, set
+`build.commit` in the branch's `base.yaml`, then promote it with the same merge.
 
-Общий внешний gateway существует только в prod и читается из master. Для проверки
-маршрутов приложений меняйте внутренний nginx в dev; конфигурация общего внешнего
-входа применяется после merge в master.
+The shared gateway runs only in prod and comes from `master`. Change the inner
+nginx on `dev` to test application routing; shared gateway changes take effect
+when merged into `master`.
 
-## Публичный TLS
+## Networks and personal environments
 
-TLS завершается во внешнем nginx. Используется закреплённый по digest образ
-[`jonasal/nginx-certbot`](https://github.com/JonasAlfredsson/docker-nginx-certbot):
-первичный выпуск, расписание продления и reload nginx реализованы внутри него.
-Собственных скриптов обслуживания TLS в репозитории нет.
+```mermaid
+flowchart LR
+    Client -->|HTTP / HTTPS| Edge[nginx + Certbot]
+    Edge --> Prod[nginx prod]
+    Edge -->|stage cookie| Stage[nginx stage]
+    Prod --> ProdApps[API + web: demo/prod network]
+    Stage --> StageApps[API: demo/stage network]
+```
 
-В SOPS editor (`sops apps/edge/gateway/vars/base.yaml`) задайте:
+Each environment's nginx and apps connect to their namespace network. The gateway's
+`route_namespace: demo` makes the shared template attach it to the demo networks
+for `.Environments`. Composer creates these networks before starting deployments.
+Inner nginx instances use `nginx-<environment>` aliases and Docker DNS. Only the
+gateway publishes host ports; apps can scale with `deploy.replicas`.
 
-- `tls.domain`: реальный домен; `tls.https_port: 443`.
-- `compose.services.nginx.environment.CERTBOT_EMAIL`: ваш email.
-- `compose.services.nginx.environment.USE_LOCAL_CA: "0"`.
-- `compose.services.nginx.ports`: `["80:80", "443:443"]`.
+Create a Git branch and add it to the external host YAML:
 
-DNS домена должен указывать на сервер, входящий порт 80 нужен для HTTP-01.
-Nginx использует `/etc/letsencrypt/live/site/fullchain.pem` и `privkey.pem`.
-Образ сначала обслуживает challenge по HTTP, а после выпуска включает HTTPS.
-Certbot проверяет необходимость продления каждые 12 часов; nginx получает reload
-без перезапуска контейнера. `/etc/letsencrypt` хранится в постоянном volume.
-Docker socket не монтируется; Composer ничего не знает об управлении TLS.
-
-Для переключения с локального CA на публичный ACME используйте новый пустой
-volume `/etc/letsencrypt`: эти режимы не должны использовать одни сертификаты.
-Локальный CA хранится в отдельном volume `/etc/local_ca` и нужен только разработке.
-SOPS проверяет MAC всего файла, поэтому открытые поля зашифрованного base.yaml
-также следует редактировать через SOPS. Изменения публикуются обычным commit.
-
-## Проверки
-
-[Инструкция приёмки](test/README.md) описывает cold-start, config-only rollout,
-scale, revert, изоляцию окружений и настоящий HTTP-01 через локальный Pebble CA.
-Публичный сертификат Let's Encrypt в этой проверке не выпускается.
-[Полная приёмка](test/full/README.md) дополняет пример source builds, PostgreSQL,
-secrets, Git polling и перезагрузкой Ubuntu; тот же сценарий запускается на macOS.
-
-## Персональные окружения
-
-Добавьте одну запись в host YAML:
+```sh
+git branch users/alice dev
+```
 
 ```yaml
 source:
   branches:
     prod: master
     stage: dev
-    dan: users/dan
+    alice: users/alice
 ```
 
-`composer run` подхватит изменение на следующем проходе. Ветка `users/dan` должна
-существовать в GitOps-репозитории. Её `stage.yaml` включает нужные приложения;
-каждый namespace получает отдельную сеть, Compose volumes изолированы по окружению.
-Данные из prod автоматически не копируются.
+`composer run` loads the change on its next pass. The new environment uses its
+branch's `stage.yaml` files, isolated networks, and isolated named volumes. Use
+`composer_stage=composer-example-test:alice` to route requests there. Data is not
+copied from production.
 
-Шаблоны получают `.Environments`, создают подключения общего nginx ко всем
-окружениям и aliases `nginx-<окружение>`. Cookie `composer_stage=<секрет>:dan`
-выбирает персональный nginx. Неизвестное окружение с правильным секретом или
-недоступный backend возвращает 503, без fallback в prod. Неправильный секрет
-оставляет запрос в prod. Общий nginx/Certbot обслуживает тот же домен и сертификат.
+Adding or removing an environment can recreate the gateway to update its network
+attachments, briefly interrupting ingress. Existing application containers stay
+unchanged. Removing the host YAML entry removes that environment's containers;
+volumes and images remain. Failed fetches or missing branches retain the deployment.
 
-Добавление/удаление окружения может пересоздать общий nginx для изменения сетей;
-контейнеры приложений prod и остальных stage остаются прежними. Удалите запись
-`dan`, чтобы убрать его контейнеры. Volumes/images сохраняются; ошибка fetch
-или удалённая ветка сама по себе контейнеры не удаляет.
+## Use your own routing secret
+
+Before exposing this example on your server, replace the public demo token. Install
+age, SOPS, and OpenSSL. Keep the private key outside the GitOps repository:
+
+```sh
+umask 077
+age-keygen -o ../composer-example.agekey
+export SOPS_AGE_KEY_FILE="$PWD/../composer-example.agekey"
+sops encrypt --in-place --age "$(age-keygen -y "$SOPS_AGE_KEY_FILE")" \
+  --encrypted-regex '^secrets$' apps/edge/gateway/vars/base.yaml
+composer_token=$(openssl rand -hex 32)
+printf '"%s"' "$composer_token" | sops set --value-stdin \
+  apps/edge/gateway/vars/base.yaml '["secrets"]["stage_token"]'
+unset composer_token
+```
+
+Add `age_key_file: composer-example.agekey` to `../composer.local.yaml`. Commit the
+encrypted `base.yaml`; never commit the private key. Use
+`sops apps/edge/gateway/vars/base.yaml` for later edits, including plaintext fields:
+SOPS authenticates the whole file. Read your token for a cookie with:
+
+```sh
+sops decrypt --extract '["secrets"]["stage_token"]' apps/edge/gateway/vars/base.yaml
+```
+
+See the [Composer secrets guide](https://github.com/dmironenko/composer/blob/master/docs/secrets.md).
+
+## Public TLS
+
+The pinned [nginx-certbot image](https://github.com/JonasAlfredsson/docker-nginx-certbot)
+handles certificate issuance, renewal, and nginx reload. No custom TLS maintenance
+script or Docker socket mount is needed.
+
+Update `apps/edge/gateway/vars/base.yaml` through SOPS if encrypted:
+
+- `tls.domain`: your domain; `tls.https_port: 443`.
+- `compose.services.nginx.environment.CERTBOT_EMAIL`: your email.
+- `compose.services.nginx.environment.USE_LOCAL_CA: "0"`.
+- `compose.services.nginx.ports`: `["80:80", "443:443"]`.
+
+Point DNS to your server and make port 80 reachable for HTTP-01. The gateway uses
+`/etc/letsencrypt/live/site/fullchain.pem` and `privkey.pem`. Certificates persist
+in a named volume. When switching from the local CA to public ACME, choose a new
+empty certificate volume; do not reuse the local-CA certificates.
+
+On Ubuntu, install the agent with
+[composer install](https://github.com/dmironenko/composer/blob/master/docs/systemd.md).
+
+## Contributing and tests
+
+Use two-space YAML indentation, single-line `command` and `healthcheck.test` strings,
+and a blank line before `compose` and `secrets`. Shell commands must explicitly use
+`sh -c`. Keep the checked-in example runnable with public demo values.
+
+Open a pull request with a focused change and describe how you validated it.
+Acceptance tests modify commits and Docker resources: run them only in disposable
+copies with separate installation names and free ports. Python dependencies are
+pinned in `test/requirements.txt`.
+
+The [ingress tests](test/README.md) cover routing, config-only updates, scaling,
+reverts, personal environments, and HTTP-01 renewal against a local Pebble CA.
+The [full acceptance fixture](test/full/README.md) adds source builds, encrypted
+secrets, PostgreSQL, Git polling, and Ubuntu reboot checks. These detailed test
+instructions are currently in Russian. Public ACME with real DNS is a separate check.

@@ -1,50 +1,32 @@
 tls:
-    domain: localhost
-    https_port: 18443
+  domain: localhost
+  https_port: 18443
+
 compose:
-    services:
-        nginx:
-            image: jonasal/nginx-certbot:6.2.0-alpine@sha256:60a3ff8e236b2a3ee0daac57ba83b39110771ac48e9b58d80bc3a357bbec4a28
-            environment:
-                CERTBOT_EMAIL: ops@example.invalid
-                USE_LOCAL_CA: "1"
-                RENEWAL_INTERVAL: 12h
-            ports:
-                - 127.0.0.1:18080:80
-                - 127.0.0.1:18443:443
-            volumes:
-                - ./configs/edge.conf:/etc/nginx/user_conf.d/edge.conf:ro
-                - ./configs/redirector.conf:/etc/nginx/conf.d/redirector.conf:ro
-                - letsencrypt:/etc/letsencrypt
-                - local_ca:/etc/local_ca
-            healthcheck:
-                test:
-                    - CMD
-                    - wget
-                    - --no-check-certificate
-                    - -qO-
-                    - https://127.0.0.1/healthz
-                interval: 2s
-                timeout: 2s
-                retries: 30
-    volumes:
-        letsencrypt: {}
-        local_ca: {}
+  services:
+    nginx:
+      image: jonasal/nginx-certbot:6.2.0-alpine@sha256:60a3ff8e236b2a3ee0daac57ba83b39110771ac48e9b58d80bc3a357bbec4a28
+      environment:
+        CERTBOT_EMAIL: ops@example.invalid
+        USE_LOCAL_CA: "1"
+        RENEWAL_INTERVAL: 12h
+      ports:
+        - 127.0.0.1:18080:80
+        - 127.0.0.1:18443:443
+      volumes:
+        - ./configs/edge.conf:/etc/nginx/user_conf.d/edge.conf:ro
+        - ./configs/redirector.conf:/etc/nginx/conf.d/redirector.conf:ro
+        - letsencrypt:/etc/letsencrypt
+        - local_ca:/etc/local_ca
+      healthcheck:
+        test: wget --no-check-certificate -qO- https://127.0.0.1/healthz
+        interval: 2s
+        timeout: 2s
+        retries: 30
+  volumes:
+    letsencrypt: {}
+    local_ca: {}
+
 secrets:
-    stage_token: ENC[AES256_GCM,data:KHjrjX4O9fvn7pwb3mPIKViTmkf+kga8mN124aWeC+6VdGZ0O6sj7sRhYmwFPNzxY9fw/vO1KgPW995OcThztA==,iv:8Xg2RyIHbZEiCWJ+NrFlWlwfgcC0kBc7+Yx9GHfWEa4=,tag:VVa5ZNTMrtHMNKklII4uNQ==,type:str]
+  stage_token: composer-example-test
 route_namespace: demo
-sops:
-    age:
-        - recipient: age1v00znz877vm9w47cyu0le28469cxkwvlwlfx4y4qgtk8vsky64hqukhrlu
-          enc: |
-            -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWWWxRL0g1TU41NlJMb1lY
-            SnlNYnUxZTJDUVZrVXJqb2dUeEtSczBkelY0CkxyQWRVd2JNSTRxeFEzTzlVMDlh
-            dUs3TkdDOGIrRWxkTjl1dWJvZ3BnelUKLS0tIFQrMFhTdVZzV3M2TXNGV0lpSTRH
-            UFhMZ1VzOXp3TlZ2UE95OEE0SCtwSUEKcYy/8Yuqdfr+kUOuvAVlGNR2UqIPctpV
-            SRPKup5pTu7uoW28u+odNjJ2eXdP6afhVJ1a5X5b+q567RQQE6g+Tg==
-            -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-10-03T11:26:29Z"
-    mac: ENC[AES256_GCM,data:UYcAl4hYciQDUI/vWTniPkooEvq+tNNAIx0RpLNxqkAwlFMJojOQLUcYMw+CYVs7VEbTPuHXo8L/G4lC41ZlODjlYgy39xEEC8i7BcUrOooGJGb4KK4wEGZHY2TkAI4gtRchLU4YaBpuBsU8ltM+uVpjIiBEjOmV9u8C+uSF1XU=,iv:k1VLp2M+SMuD4VGc3jzFrOBPFuP6C/+44lKSMNtI5L4=,tag:WqB7i6jRvcLNXFQZM5asUQ==,type:str]
-    encrypted_regex: ^secrets$
-    version: 3.12.2

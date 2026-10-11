@@ -23,6 +23,7 @@ def main():
     args = parser.parse_args()
     host = args.host.resolve()
     settings = yaml.safe_load(host.read_text())
+    age_key = host.parent / settings["age_key_file"] if settings.get("age_key_file") else None
     repo = (host.parent / settings["source"]["path"]).resolve()
     prefix = settings["installation"] + "-"
     master, stage = settings["source"]["branches"]["prod"], settings["source"]["branches"]["stage"]
@@ -83,8 +84,8 @@ def main():
     base = repo / "apps/demo/api/vars/base.yaml"
     values = yaml.safe_load(base.read_text())
     volumes = values["compose"]["services"]["api-http"]["volumes"] + ["personal_data:/personal"]
-    set_value(base, ["compose", "services", "api-http", "volumes"], volumes, host.parent / settings["age_key_file"])
-    set_value(base, ["compose", "volumes", "personal_data"], {}, host.parent / settings["age_key_file"])
+    set_value(base, ["compose", "services", "api-http", "volumes"], volumes, age_key)
+    set_value(base, ["compose", "volumes", "personal_data"], {}, age_key)
     commit("test environment data volumes")
     run("git", "-C", str(repo), "branch", "-f", stage, master)
     run("git", "-C", str(repo), "checkout", "-qb", "users/dan", master)

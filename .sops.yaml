@@ -1,4 +1,0 @@
-creation_rules:
-- age: age1v00znz877vm9w47cyu0le28469cxkwvlwlfx4y4qgtk8vsky64hqukhrlu
-  encrypted_regex: ^secrets$
-  path_regex: apps/edge/gateway/vars/.*\.yaml$

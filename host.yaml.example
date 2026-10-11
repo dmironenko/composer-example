@@ -8,7 +8,6 @@ source:
     stage: dev
   poll_interval: 2s
 state_dir: composer-example-state
-age_key_file: composer-example.agekey
 docker: {}
 reconcile:
   parallelism: 4

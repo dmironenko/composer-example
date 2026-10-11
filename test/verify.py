@@ -18,11 +18,13 @@ def run(*args: str) -> str:
     return subprocess.check_output(args, text=True).strip()
 
 
-def set_value(path: Path, keys: list[str], value, age_key: Path) -> None:
+def set_value(path: Path, keys: list[str], value, age_key: Path | None = None) -> None:
     """Edit fixture vars, using SOPS to preserve authentication of encrypted files."""
     values = yaml.safe_load(path.read_text())
     encrypted = "sops" in values
-    env = dict(os.environ, SOPS_AGE_KEY_FILE=str(age_key))
+    env = os.environ.copy()
+    if age_key is not None:
+        env["SOPS_AGE_KEY_FILE"] = str(age_key)
     if encrypted:
         values = yaml.safe_load(subprocess.check_output(
             ["sops", "decrypt", str(path)], text=True, env=env))
@@ -47,6 +49,7 @@ def main() -> None:
     args = parser.parse_args()
     host = args.host.resolve()
     settings = yaml.safe_load(host.read_text())
+    age_key = host.parent / settings["age_key_file"] if settings.get("age_key_file") else None
     repo = (host.parent / settings["source"]["path"]).resolve()
     state = (host.parent / settings["state_dir"]).resolve()
 
@@ -59,7 +62,7 @@ def main() -> None:
     # These tests use one shared branch; keep the stage replica count independent.
     stage_api = repo / "apps/demo/api/vars/stage.yaml"
     set_value(stage_api, ["compose", "services", "api-http", "deploy", "replicas"],
-              1, host.parent / settings["age_key_file"])
+              1, age_key)
     run("git", "-C", str(repo), "add", str(stage_api))
     if run("git", "-C", str(repo), "diff", "--cached", "--name-only"):
         run("git", "-C", str(repo), "commit", "-qm", "test independent stage replicas")
@@ -68,8 +71,12 @@ def main() -> None:
     projects = {p["name"]: p for p in report["projects"] if p["enabled"]}
     proxy_config = next(state.glob("deployments/prod/*/configs/*/configs/edge.conf"))
     token = re.search(r'"([^"\s]+):stage" env_stage;', proxy_config.read_text())[1]
-    encrypted = (repo / "apps/edge/gateway/vars/base.yaml").read_text()
-    assert "ENC[AES256_GCM," in encrypted and token not in encrypted
+    gateway = (repo / "apps/edge/gateway/vars/base.yaml").read_text()
+    values = yaml.safe_load(gateway)
+    if "sops" in values:
+        assert "ENC[AES256_GCM," in gateway and token not in gateway
+    else:
+        assert token == values["secrets"]["stage_token"]
     tls = ssl._create_unverified_context()  # Only the local bootstrap certificate.
 
     def request(path="/api/", cookie=None):
@@ -155,7 +162,7 @@ def main() -> None:
     base_file = repo / "apps/demo/api/vars/base.yaml"
     original = base_file.read_bytes()
     set_value(base_file, ["compose", "services", "api-http", "deploy", "replicas"],
-              3, host.parent / settings["age_key_file"])
+              3, age_key)
     commit("test three API replicas")
     scaled = snapshot()
     api = project("prod", "api")

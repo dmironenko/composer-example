@@ -10,7 +10,7 @@ API использует PostgreSQL client и BusyBox HTTP server из закр�
 
 ```sh
 python3 -m venv .venv
-.venv/bin/pip install -r scripts/requirements.txt
+.venv/bin/pip install -r test/requirements.txt
 .venv/bin/python test/full/prepare.py /tmp/composer-full
 limactl start --name=composer-acceptance --tty=false test/full/ubuntu.yaml
 limactl shell composer-acceptance sudo bash -c \

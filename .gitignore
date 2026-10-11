@@ -3,3 +3,10 @@ __pycache__/
 .venv/
 .ruff_cache/
 .DS_Store
+*.pem
+*.key
+.env
+.env.*
+/composer.local.yaml
+/state/
+*-state/
