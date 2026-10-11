@@ -1,6 +1,17 @@
+FROM golang:1.26-alpine AS builder
+
+RUN apk add --no-cache git
+WORKDIR /src
+
+ARG COMPOSER_COMMIT
+RUN git clone {{ quote .Vars.build.repository }} . \
+    && git checkout "$COMPOSER_COMMIT" \
+    && CGO_ENABLED=0 go build -trimpath -o /out/api .
+
 FROM busybox:1.37.0
 
 ARG COMPOSER_COMMIT
 LABEL org.opencontainers.image.revision=$COMPOSER_COMMIT
 
-COPY --chmod=755 apps/demo/api/src/start.sh /usr/local/bin/api
+COPY --from=builder /out/api /usr/local/bin/api
+COPY --from=builder /src/LICENSE /usr/share/licenses/http-echo/LICENSE

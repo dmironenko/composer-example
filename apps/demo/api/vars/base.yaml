@@ -2,13 +2,13 @@ app:
   message: "api: production"
 
 build:
-  repository: https://github.com/dmironenko/composer-example.git
-  commit: "9e0d8395d805ed4cb0719e8443c873455135384f"
+  repository: https://github.com/hashicorp/http-echo.git
+  commit: "767bbd9c3d1905acb04891d5c5e208de17b34a71"
 
 compose:
   services:
     api-http:
-      command: /usr/local/bin/api
+      command: sh -c 'exec /usr/local/bin/api -listen=:8080 -text="$(cat /etc/app/message.txt) $(hostname)"'
       volumes:
         - ./configs/message.txt:/etc/app/message.txt:ro
       deploy:
