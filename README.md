@@ -17,7 +17,6 @@ apps/
       configs/
 templates/compose.yaml.tmpl
 host.yaml.example          # copy outside this repository
-test/                      # disposable acceptance fixtures
 ```
 
 One directory is one Compose project. `prod` reads `base.yaml`; other environments
@@ -181,19 +180,18 @@ empty certificate volume; do not reuse the local-CA certificates.
 On Ubuntu, install the agent with
 [composer install](https://github.com/dmironenko/composer/blob/master/docs/systemd.md).
 
-## Contributing and tests
+## Contributing
 
 Use two-space YAML indentation, single-line `command` and `healthcheck.test` strings,
 and a blank line before `compose` and `secrets`. Shell commands must explicitly use
 `sh -c`. Keep the checked-in example runnable with public demo values.
 
 Open a pull request with a focused change and describe how you validated it.
-Acceptance tests modify commits and Docker resources: run them only in disposable
-copies with separate installation names and free ports. Python dependencies are
-pinned in `test/requirements.txt`.
+Validate changes before applying them:
 
-The [ingress tests](test/README.md) cover routing, config-only updates, scaling,
-reverts, personal environments, and HTTP-01 renewal against a local Pebble CA.
-The [full acceptance fixture](test/full/README.md) adds source builds, encrypted
-secrets, PostgreSQL, Git polling, and Ubuntu reboot checks. These detailed test
-instructions are currently in Russian. Public ACME with real DNS is a separate check.
+```sh
+../composer/bin/composer validate --config ../composer.local.yaml
+```
+
+Commit changes first: Composer reads committed snapshots. Try deployments in a
+separate installation with its own state directory and free ports.

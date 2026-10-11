@@ -1,7 +1,0 @@
-FROM busybox:1.37.0-musl@sha256:5cec3fc171c87218698e85a52af7087de727372aae264a787b8112901a5b0092 AS tools
-FROM postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
-ARG COMPOSER_COMMIT
-LABEL org.opencontainers.image.revision=$COMPOSER_COMMIT
-COPY --from=tools /bin/busybox /usr/local/bin/busybox
-COPY . /app
-ENTRYPOINT ["sh", "/app/app.sh"]
