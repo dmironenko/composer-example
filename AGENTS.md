@@ -5,6 +5,7 @@ This is a runnable GitOps example for Composer, not deployment state.
 - Check Git status before edits and preserve existing work.
 - Use two-space YAML indentation and single-line command/healthcheck.test strings.
 - Put a blank line before compose and secrets blocks. Use sh -c for shell commands.
+- Keep secrets last in vars files, before any SOPS metadata.
 - Keep public demo values in Git. Never commit real credentials, private keys, or rendered state.
 - Keep host configuration outside this repository; host.yaml.example is a template.
 - One app directory is one Compose project; each namespace/environment has its own network.

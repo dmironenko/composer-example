@@ -1,3 +1,6 @@
+app:
+  route_namespace: demo
+
 tls:
   domain: localhost
   https_port: 18443
@@ -29,4 +32,3 @@ compose:
 
 secrets:
   stage_token: composer-example-test
-route_namespace: demo

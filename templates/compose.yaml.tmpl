@@ -1,7 +1,8 @@
 {{- $compose := .Vars.compose -}}
+{{- $routeNamespace := get (get .Vars "app") "route_namespace" -}}
 {{- $networks := dict "default" (dict "external" true "name" .Runtime.NetworkName) -}}
 {{- $routes := dict "default" (dict) -}}
-{{- with (get .Vars "route_namespace") -}}
+{{- with $routeNamespace -}}
 {{- $namespace := . -}}
 {{- range $.Environments -}}
 {{- $name := printf "env_%s" . -}}
@@ -20,7 +21,7 @@ services:
 {{- with (get $.Vars "network_alias") -}}
 {{- $service = merge $service (dict "networks" (dict "default" (dict "aliases" (list (printf "%s-%s" . $.Env))))) -}}
 {{- end -}}
-{{- if get $.Vars "route_namespace" -}}
+{{- if $routeNamespace -}}
 {{- $service = merge (dict "networks" $routes) $service -}}
 {{- end }}
 {{ toYAML (merge $defaults $service) | indent 4 }}

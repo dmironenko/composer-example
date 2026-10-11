@@ -94,7 +94,7 @@ flowchart LR
     Stage --> StageApps[API: demo/stage network]
 ```
 
-Each environment has its own demo network. `route_namespace: demo` connects the
+Each environment has its own demo network. `app.route_namespace: demo` connects the
 ingress to these networks. Only the ingress publishes ports; apps can scale with
 `deploy.replicas`.
 
