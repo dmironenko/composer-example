@@ -30,8 +30,8 @@ Requires Git, Go 1.26.3 or newer, and Docker Engine or Docker Desktop. Clone the
 repositories side by side into a new directory:
 
 ```sh
-git clone https://github.com/dmironenko/composer.git
-git clone https://github.com/dmironenko/composer-example.git
+git clone --branch master https://github.com/dmironenko/composer.git
+git clone --branch master https://github.com/dmironenko/composer-example.git
 (cd composer && go build -o bin/composer ./cmd/composer)
 cd composer-example
 git branch dev master
