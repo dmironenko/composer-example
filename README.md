@@ -127,20 +127,27 @@ keeps volumes and images. Failed fetches or missing branches preserve deployment
 
 ## Secrets
 
-The `secrets` field at the bottom of `apps/ingress/nginx/vars/base.yaml` is one
-age-encrypted string. It contains `stage_token: composer-example-test`.
-Composer reads the shared key from `age_key_file` and exposes the decrypted
-mapping to templates as `.Secrets`. App settings remain ordinary YAML.
+The `secrets.stage_token` value at the bottom of `apps/ingress/nginx/vars/base.yaml`
+is encrypted with age. Field names and nesting remain visible. Composer reads
+the shared key from `age_key_file` and exposes the decrypted value to templates
+as `.Secrets.stage_token`.
 
-To replace the block, encrypt a YAML mapping and paste the output after `secrets:`:
+Encrypt one value and paste the output after `stage_token:`:
 
 ```sh
-../composer/bin/composer secrets encrypt --key-file ../composer-example.agekey <<'YAML'
-stage_token: composer-example-test
-YAML
+printf '%s' 'composer-example-test' | ../composer/bin/composer secrets encrypt --key-file ../composer-example.agekey
 ```
 
-To read it, run this command, paste only the `age:…` value, and finish with Ctrl-D:
+More secrets can be added independently:
+
+```yaml
+secrets:
+  stage_token: age:...
+  database:
+    password: age:...
+```
+
+To read a value, run this command, paste only its `age:…` string, and finish with Ctrl-D:
 
 ```sh
 ../composer/bin/composer secrets decrypt --key-file ../composer-example.agekey
