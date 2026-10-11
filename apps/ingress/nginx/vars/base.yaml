@@ -14,7 +14,7 @@ compose:
         - 127.0.0.1:18080:80
         - 127.0.0.1:18443:443
       volumes:
-        - ./configs/edge.conf:/etc/nginx/user_conf.d/edge.conf:ro
+        - ./configs/nginx.conf:/etc/nginx/user_conf.d/nginx.conf:ro
         - ./configs/redirector.conf:/etc/nginx/conf.d/redirector.conf:ro
         - letsencrypt:/etc/letsencrypt
         - local_ca:/etc/local_ca

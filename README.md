@@ -11,8 +11,8 @@ apps/
     api/                   # base.yaml, stage.yaml, message template
     web/                   # base.yaml, message template
     nginx/                 # base.yaml, stage.yaml, nginx template
-  edge/
-    gateway/               # nginx + Certbot
+  ingress/
+    nginx/                 # nginx + Certbot
       vars/base.yaml       # TLS settings and a public demo routing token
       configs/
 templates/compose.yaml.tmpl
@@ -44,9 +44,9 @@ example has a public test token, `composer-example-test`; age, SOPS, and Python 
 not needed to start it. Composer reads committed branches, so commit edits before
 applying them. Host configuration paths are relative to the host YAML file.
 
-The gateway binds only `127.0.0.1:18080` and `127.0.0.1:18443`. Before running another
+The ingress nginx binds only `127.0.0.1:18080` and `127.0.0.1:18443`. Before running another
 copy, choose a unique `installation` and `state_dir` in host YAML and free ports in
-`apps/edge/gateway/vars/base.yaml`, including `tls.https_port`. Commit those port
+`apps/ingress/nginx/vars/base.yaml`, including `tls.https_port`. Commit those port
 changes to both selected branches. Containers, networks, and named volumes are
 isolated by installation and environment; published ports must still be distinct.
 
@@ -86,26 +86,26 @@ Revert a commit in the corresponding branch to roll back. Config-only changes
 are applied even when an image has not changed. For source builds, set
 `build.commit` in the branch's `base.yaml`, then promote it with the same merge.
 
-The shared gateway runs only in prod and comes from `master`. Change the inner
-nginx on `dev` to test application routing; shared gateway changes take effect
+The shared ingress nginx runs only in prod and comes from `master`. Change the inner
+nginx on `dev` to test application routing; shared ingress nginx changes take effect
 when merged into `master`.
 
 ## Networks and personal environments
 
 ```mermaid
 flowchart LR
-    Client -->|HTTP / HTTPS| Edge[nginx + Certbot]
-    Edge --> Prod[nginx prod]
-    Edge -->|stage cookie| Stage[nginx stage]
+    Client -->|HTTP / HTTPS| Ingress[nginx + Certbot]
+    Ingress --> Prod[nginx prod]
+    Ingress -->|stage cookie| Stage[nginx stage]
     Prod --> ProdApps[API + web: demo/prod network]
     Stage --> StageApps[API: demo/stage network]
 ```
 
-Each environment's nginx and apps connect to their namespace network. The gateway's
+Each environment's nginx and apps connect to their namespace network. The ingress nginx's
 `route_namespace: demo` makes the shared template attach it to the demo networks
 for `.Environments`. Composer creates these networks before starting deployments.
 Inner nginx instances use `nginx-<environment>` aliases and Docker DNS. Only the
-gateway publishes host ports; apps can scale with `deploy.replicas`.
+ingress nginx publishes host ports; apps can scale with `deploy.replicas`.
 
 Create a Git branch and add it to the external host YAML:
 
@@ -126,7 +126,7 @@ branch's `stage.yaml` files, isolated networks, and isolated named volumes. Use
 `composer_stage=composer-example-test:alice` to route requests there. Data is not
 copied from production.
 
-Adding or removing an environment can recreate the gateway to update its network
+Adding or removing an environment can recreate the ingress nginx to update its network
 attachments, briefly interrupting ingress. Existing application containers stay
 unchanged. Removing the host YAML entry removes that environment's containers;
 volumes and images remain. Failed fetches or missing branches retain the deployment.
@@ -141,20 +141,20 @@ umask 077
 age-keygen -o ../composer-example.agekey
 export SOPS_AGE_KEY_FILE="$PWD/../composer-example.agekey"
 sops encrypt --in-place --age "$(age-keygen -y "$SOPS_AGE_KEY_FILE")" \
-  --encrypted-regex '^secrets$' apps/edge/gateway/vars/base.yaml
+  --encrypted-regex '^secrets$' apps/ingress/nginx/vars/base.yaml
 composer_token=$(openssl rand -hex 32)
 printf '"%s"' "$composer_token" | sops set --value-stdin \
-  apps/edge/gateway/vars/base.yaml '["secrets"]["stage_token"]'
+  apps/ingress/nginx/vars/base.yaml '["secrets"]["stage_token"]'
 unset composer_token
 ```
 
 Add `age_key_file: composer-example.agekey` to `../composer.local.yaml`. Commit the
 encrypted `base.yaml`; never commit the private key. Use
-`sops apps/edge/gateway/vars/base.yaml` for later edits, including plaintext fields:
+`sops apps/ingress/nginx/vars/base.yaml` for later edits, including plaintext fields:
 SOPS authenticates the whole file. Read your token for a cookie with:
 
 ```sh
-sops decrypt --extract '["secrets"]["stage_token"]' apps/edge/gateway/vars/base.yaml
+sops decrypt --extract '["secrets"]["stage_token"]' apps/ingress/nginx/vars/base.yaml
 ```
 
 See the [Composer secrets guide](https://github.com/dmironenko/composer/blob/master/docs/secrets.md).
@@ -165,14 +165,14 @@ The pinned [nginx-certbot image](https://github.com/JonasAlfredsson/docker-nginx
 handles certificate issuance, renewal, and nginx reload. No custom TLS maintenance
 script or Docker socket mount is needed.
 
-Update `apps/edge/gateway/vars/base.yaml` through SOPS if encrypted:
+Update `apps/ingress/nginx/vars/base.yaml` through SOPS if encrypted:
 
 - `tls.domain`: your domain; `tls.https_port: 443`.
 - `compose.services.nginx.environment.CERTBOT_EMAIL`: your email.
 - `compose.services.nginx.environment.USE_LOCAL_CA: "0"`.
 - `compose.services.nginx.ports`: `["80:80", "443:443"]`.
 
-Point DNS to your server and make port 80 reachable for HTTP-01. The gateway uses
+Point DNS to your server and make port 80 reachable for HTTP-01. The ingress nginx uses
 `/etc/letsencrypt/live/site/fullchain.pem` and `privkey.pem`. Certificates persist
 in a named volume. When switching from the local CA to public ACME, choose a new
 empty certificate volume; do not reuse the local-CA certificates.
