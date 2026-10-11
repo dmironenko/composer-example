@@ -9,7 +9,8 @@ This is a runnable GitOps example for Composer, not deployment state.
 - Keep secrets last in vars files, before any SOPS metadata.
 - demo.agekey is an intentionally public demo identity; never use it for real secrets.
 - Keep real credentials, private keys, and rendered state out of Git.
-- Encrypt secrets with SOPS; .sops.yaml sets two-space indentation. Preserve blank lines before compose and secrets.
+- .sops.yaml defines shared encryption rules and two-space indentation.
+- Let SOPS generate per-file metadata. Preserve blank lines before compose and secrets.
 - Keep host configuration outside this repository; host.yaml.example is a template.
 - One app directory is one Compose project; each namespace/environment has its own network.
 - Prod reads base.yaml; every other environment reads base.yaml plus stage.yaml.

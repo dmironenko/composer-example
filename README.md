@@ -132,6 +132,16 @@ keeps volumes and images. Failed fetches or missing branches preserve deployment
 `age_key_file`, decrypts the token and passes it to nginx's template as
 `.Secrets.stage_token`. The rest of the YAML stays readable.
 
+The shared `.sops.yaml` selects the encryption key and the `secrets` block for all
+apps. Create a vars file as ordinary YAML, then encrypt it before committing:
+
+```sh
+sops encrypt --in-place apps/demo/my-api/vars/base.yaml
+```
+
+SOPS adds the `sops` metadata block, including `recipient`, `enc`, and `mac`.
+These belong to each encrypted file; do not write or copy them manually.
+
 With SOPS installed, edit the file, including its unencrypted fields:
 
 ```sh
@@ -163,8 +173,10 @@ printf '"%s"' "$composer_token" | sops set --value-stdin \
 unset composer_token
 ```
 
-Set `age_key_file: composer-private.agekey` in `../composer.local.yaml` and commit
-the encrypted file. Keep your private key outside Git. Use SOPS for later edits.
+Set `age_key_file: composer-private.agekey` in `../composer.local.yaml`. Also replace
+`age` in `.sops.yaml` with the output of `age-keygen -y ../composer-private.agekey`
+so new files use your key. Commit `.sops.yaml` and the encrypted file; keep your
+private key outside Git. Use SOPS for later edits.
 See the [Composer secrets guide](https://github.com/dmironenko/composer/blob/master/docs/secrets.md).
 
 ## Public TLS
