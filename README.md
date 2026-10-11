@@ -1,9 +1,9 @@
 # Composer example
 
-A runnable GitOps repository for [Composer](https://github.com/dmironenko/composer).
-An outer nginx terminates TLS and routes requests to independent production and
-stage nginx instances. The API runs in both environments; the web app runs only in
-production. Container images are pinned by digest.
+A GitOps example for [Composer](https://github.com/dmironenko/composer).
+The ingress nginx handles TLS with Certbot and routes requests to prod or stage.
+The API runs in both environments; the web app runs only in prod. Images are pinned
+by digest.
 
 ```text
 apps/
@@ -19,9 +19,8 @@ templates/compose.yaml.tmpl
 host.yaml.example          # copy outside this repository
 ```
 
-One directory is one Compose project. `prod` reads `base.yaml`; other environments
-read `base.yaml` plus `stage.yaml`. Missing `stage.yaml` disables an app outside
-production. Put shared settings in `base.yaml` and only differences in `stage.yaml`.
+`prod` reads `base.yaml`; other environments add `stage.yaml` overrides.
+Missing `stage.yaml` disables an app outside prod.
 
 ## Local quick start
 
@@ -39,18 +38,16 @@ cp host.yaml.example ../composer.local.yaml
 ../composer/bin/composer apply --config ../composer.local.yaml --wait --timeout 15m
 ```
 
-If a local `dev` branch already exists, use it instead of creating it again. The
-example has a public test token, `composer-example-test`; age, SOPS, and Python are
-not needed to start it. Composer reads committed branches, so commit edits before
-applying them. Host configuration paths are relative to the host YAML file.
+Skip `git branch dev master` if `dev` already exists. Host configuration paths
+are relative to the host YAML file. Composer reads committed snapshots.
 
-The ingress nginx binds only `127.0.0.1:18080` and `127.0.0.1:18443`. Before running another
-copy, choose a unique `installation` and `state_dir` in host YAML and free ports in
-`apps/ingress/nginx/vars/base.yaml`, including `tls.https_port`. Commit those port
-changes to both selected branches. Containers, networks, and named volumes are
-isolated by installation and environment; published ports must still be distinct.
+The ingress binds `127.0.0.1:18080` and `127.0.0.1:18443`. For another copy, use a
+unique `installation` and `state_dir`, and choose free ports in
+`apps/ingress/nginx/vars/base.yaml`, including `tls.https_port`. Commit port changes
+to both branches.
 
-Networks, volumes, and a local development certificate are created automatically:
+Composer creates networks and volumes; nginx-certbot creates a local certificate.
+Check both environments, then start polling:
 
 ```sh
 curl -ki https://localhost:18443/api/
@@ -59,13 +56,12 @@ curl -ki --cookie 'composer_stage=composer-example-test:stage' https://localhost
 ```
 
 The first request returns `X-Composer-Environment: prod`; the second selects stage.
-`/api/` works in both environments. `/` returns an error in stage because no stage
-web app is configured. Invalid or missing cookies select prod; an unavailable
-selected environment returns an error, without falling back to prod.
+`/api/` works in both; `/` fails in stage because it has no web app. Invalid or
+missing cookies select prod. An unavailable selected environment returns an error.
 
-Use a separate browser profile for stage: the same origin shares cookies and local
-storage. The routing cookie is not application authentication. The local certificate
-is for development; `curl -k` skips certificate verification only for this example.
+Use a separate browser profile for stage to avoid sharing cookies and local storage.
+The cookie selects traffic; it does not authenticate users. `curl -k` skips
+verification of the local development certificate.
 
 ## Change an application
 
@@ -81,14 +77,11 @@ git switch master
 git merge dev
 ```
 
-The local source sees commits without a push. Remote sources require a push.
-Revert a commit in the corresponding branch to roll back. Config-only changes
-are applied even when an image has not changed. For source builds, set
-`build.commit` in the branch's `base.yaml`, then promote it with the same merge.
+Local sources see commits without a push; remote sources need one. Config-only
+changes also trigger deployment. Revert a commit to roll back. For source builds,
+change `build.commit` in `base.yaml` and promote it with the same merge.
 
-The shared ingress nginx runs only in prod and comes from `master`. Change the inner
-nginx on `dev` to test application routing; shared ingress nginx changes take effect
-when merged into `master`.
+The shared ingress runs only from `master`. Test inner nginx routing on `dev`.
 
 ## Networks and personal environments
 
@@ -101,11 +94,9 @@ flowchart LR
     Stage --> StageApps[API: demo/stage network]
 ```
 
-Each environment's nginx and apps connect to their namespace network. The ingress nginx's
-`route_namespace: demo` makes the shared template attach it to the demo networks
-for `.Environments`. Composer creates these networks before starting deployments.
-Inner nginx instances use `nginx-<environment>` aliases and Docker DNS. Only the
-ingress nginx publishes host ports; apps can scale with `deploy.replicas`.
+Each environment has its own demo network. `route_namespace: demo` connects the
+ingress to these networks. Only the ingress publishes ports; apps can scale with
+`deploy.replicas`.
 
 Create a Git branch and add it to the external host YAML:
 
@@ -121,20 +112,18 @@ source:
     alice: users/alice
 ```
 
-`composer run` loads the change on its next pass. The new environment uses its
-branch's `stage.yaml` files, isolated networks, and isolated named volumes. Use
-`composer_stage=composer-example-test:alice` to route requests there. Data is not
-copied from production.
+`composer run` picks up the entry on its next pass. Use
+`composer_stage=composer-example-test:alice` to select it. The environment uses its
+branch's `stage.yaml` overrides and separate networks and volumes; prod data is
+not copied.
 
-Adding or removing an environment can recreate the ingress nginx to update its network
-attachments, briefly interrupting ingress. Existing application containers stay
-unchanged. Removing the host YAML entry removes that environment's containers;
-volumes and images remain. Failed fetches or missing branches retain the deployment.
+Adding or removing an environment can briefly interrupt ingress while its network
+attachments update. Removing the entry removes that environment's containers but
+keeps volumes and images. Failed fetches or missing branches preserve deployments.
 
 ## Use your own routing secret
 
-Before exposing this example on your server, replace the public demo token. Install
-age, SOPS, and OpenSSL. Keep the private key outside the GitOps repository:
+Replace the public token before exposing the stack. With age, SOPS, and OpenSSL installed:
 
 ```sh
 umask 077
@@ -149,9 +138,8 @@ unset composer_token
 ```
 
 Add `age_key_file: composer-example.agekey` to `../composer.local.yaml`. Commit the
-encrypted `base.yaml`; never commit the private key. Use
-`sops apps/ingress/nginx/vars/base.yaml` for later edits, including plaintext fields:
-SOPS authenticates the whole file. Read your token for a cookie with:
+encrypted file and keep the private key outside Git. Use
+`sops apps/ingress/nginx/vars/base.yaml` for all later edits. To read the token:
 
 ```sh
 sops decrypt --extract '["secrets"]["stage_token"]' apps/ingress/nginx/vars/base.yaml
@@ -162,8 +150,7 @@ See the [Composer secrets guide](https://github.com/dmironenko/composer/blob/mas
 ## Public TLS
 
 The pinned [nginx-certbot image](https://github.com/JonasAlfredsson/docker-nginx-certbot)
-handles certificate issuance, renewal, and nginx reload. No custom TLS maintenance
-script or Docker socket mount is needed.
+issues and renews certificates and reloads nginx.
 
 Update `apps/ingress/nginx/vars/base.yaml` through SOPS if encrypted:
 
@@ -172,10 +159,9 @@ Update `apps/ingress/nginx/vars/base.yaml` through SOPS if encrypted:
 - `compose.services.nginx.environment.USE_LOCAL_CA: "0"`.
 - `compose.services.nginx.ports`: `["80:80", "443:443"]`.
 
-Point DNS to your server and make port 80 reachable for HTTP-01. The ingress nginx uses
-`/etc/letsencrypt/live/site/fullchain.pem` and `privkey.pem`. Certificates persist
-in a named volume. When switching from the local CA to public ACME, choose a new
-empty certificate volume; do not reuse the local-CA certificates.
+Point DNS to your server and open port 80 for HTTP-01. Certificates persist in a
+named volume. Use a new empty certificate volume when switching from the local CA
+to public ACME.
 
 On Ubuntu, install the agent with
 [composer install](https://github.com/dmironenko/composer/blob/master/docs/systemd.md).
@@ -186,12 +172,11 @@ Use two-space YAML indentation, single-line `command` and `healthcheck.test` str
 and a blank line before `compose` and `secrets`. Shell commands must explicitly use
 `sh -c`. Keep the checked-in example runnable with public demo values.
 
-Open a pull request with a focused change and describe how you validated it.
-Validate changes before applying them:
+Commit changes, then validate:
 
 ```sh
 ../composer/bin/composer validate --config ../composer.local.yaml
 ```
 
-Commit changes first: Composer reads committed snapshots. Try deployments in a
-separate installation with its own state directory and free ports.
+Test deployments in a separate installation with its own state directory and free
+ports. Describe your checks in the pull request.
