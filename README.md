@@ -142,12 +142,12 @@ More secrets can be added independently:
 
 ```yaml
 secrets:
-  stage_token: age:...
+  stage_token: ENC[...]
   database:
-    password: age:...
+    password: ENC[...]
 ```
 
-To read a value, run this command, paste only its `age:…` string, and finish with Ctrl-D:
+To read a value, run this command, paste only its `ENC[…]` string, and finish with Ctrl-D:
 
 ```sh
 ../composer/bin/composer secrets decrypt --key-file ../composer-example.agekey
