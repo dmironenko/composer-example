@@ -1,8 +1,0 @@
-stores:
-  yaml:
-    indent: 2
-
-creation_rules:
-  - path_regex: ^apps/[^/]+/[^/]+/vars/(base|stage)\.yaml$
-    encrypted_regex: ^secrets$
-    age: age1crff86ca2wnmzcwysrdd8q4m8twqs3zh77v30zt74tku6ejss3zsmyuz0w

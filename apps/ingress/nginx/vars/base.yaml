@@ -29,21 +29,4 @@ compose:
     letsencrypt: {}
     local_ca: {}
 
-secrets:
-  stage_token: ENC[AES256_GCM,data:HqCSi3Fq/A7F75xEw1h5drFmJkfU,iv:eF0pWRpvHZ+F/PyhASSmKyS8ZwOeJLvCkoko3a7bKE0=,tag:LJ9OgvtFpClMVbJW8EfMjA==,type:str]
-
-sops:
-  age:
-    - recipient: age1crff86ca2wnmzcwysrdd8q4m8twqs3zh77v30zt74tku6ejss3zsmyuz0w
-      enc: |
-        -----BEGIN AGE ENCRYPTED FILE-----
-        YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0anFUckdFM25ISzBlcUNv
-        NXJmdXhWRG9sSmwzNTNCVVduamFlNzd6UHhFCktFR3BJditOblBYYUNDak51WDZl
-        YUVCTTllelZ0NndRL2E1L0xGNDZ4WW8KLS0tIHdKQjVBWEJybW5aWHhkQnRkdmtr
-        UXd2MzJLSHNCQ2pjOHNwU3IxSWVIcFkKeRuWbGZ0U89PlRF/Rpi5CunXqIDNbcQD
-        Qs+aDZVQaO9Go1Q5v/50uhYRT5cDht4c11MrCR0Hfm2HinpafU/03w==
-        -----END AGE ENCRYPTED FILE-----
-  lastmodified: "2026-10-11T18:45:11Z"
-  mac: ENC[AES256_GCM,data:6453RBI0pZmZNAx6LwDZLaf80tBSdVxbbM3iNXPpjvvWHR6fK92H1Atz8lb9BBaIhxaRftVgvc2stZBikYDOpZTAuEcCgH/vHcDx97NEtNGyG2HnPtVVLb0gMZOfXokDKDsuapDEiDYg6emni03N0lr4LKJPMdpAt5BC6JObIkU=,iv:09jupFCZgREcLIK8ssnprzjke8kfpgnEB9X2sVOlxaE=,tag:ORq1DZ6YKa8bg2/sApdSBA==,type:str]
-  encrypted_regex: ^secrets$
-  version: 3.12.2
+secrets: age:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhNld6bHArMEp1VU9md0NvQTEydE1EZFQwaklFRlFNTmNyTnJIaUZKSTNjClhHa1pIYTVGNWxJV2RPbFcvTTNjcEM5bnBTV2xFZFBBNkVKajBlaC8xWWsKLS0tIERWTDNnaUlWZHdNWnd6a1dYLzBrajQ2TWpybHJjK2NTZ2d3K0d5UVdnNE0KS/WMPZpDrj79iE/SLqSYZMtxDtwZ6WdJWizQh0HXSj7FWqeM9ZuvoCax0icEZ6kvj7zGRlF6COX2DPRj6//GO/io9g==
