@@ -194,7 +194,7 @@ Update `apps/ingress/nginx/vars/base.yaml`:
 - `app.tls.domain`: your domain; `app.tls.https_port: 443`.
 - `compose.services.nginx.environment.CERTBOT_EMAIL`: your email.
 - `compose.services.nginx.environment.USE_LOCAL_CA: "0"`.
-- `compose.services.nginx.ports`: `["80:80", "443:443"]`.
+- `compose.services.nginx.ports`: `[80:80, 443:443]`.
 
 Point DNS to your server and open port 80 for HTTP-01. Certificates persist in a
 named volume. Use a new empty certificate volume when switching from the local CA
