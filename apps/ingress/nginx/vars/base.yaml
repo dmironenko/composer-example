@@ -1,5 +1,7 @@
 app:
   route_namespace: demo
+  proxy_read_timeout: 60s
+  proxy_max_temp_file_size: 0
   tls:
     domain: localhost
     https_port: 18443
