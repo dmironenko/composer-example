@@ -21,7 +21,7 @@ resolver_timeout 2s;
 {{ range .Environments }}
 upstream env_{{ . }} {
     zone env_{{ . }} 64k;
-    server nginx-{{ . }}:8080 resolve;
+    server nginx{{ if ne . "prod" }}-{{ . }}{{ end }}:8080 resolve;
 }
 {{ end }}
 

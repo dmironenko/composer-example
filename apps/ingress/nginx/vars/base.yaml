@@ -1,5 +1,4 @@
 app:
-  route_namespace: demo
   proxy_read_timeout: 60s
   proxy_max_temp_file_size: 0
   tls:
@@ -7,6 +6,9 @@ app:
     https_port: 18443
 
 compose:
+  x-composer:
+    route_namespace: demo
+
   services:
     nginx:
       image: jonasal/nginx-certbot:6.2.0-alpine

@@ -8,10 +8,11 @@ environment by cookie.
 ## Quick start
 
 Requires Go 1.26.8 or newer, Git, and a running Docker Engine or Docker Desktop.
-Install Composer and ensure `$HOME/go/bin` is on your `PATH`:
+Install Composer from `master` and ensure `$HOME/go/bin` is on your `PATH`:
+The example uses changes not yet included in v1.0.0.
 
 ```sh
-go install github.com/dmironenko/composer/cmd/composer@latest
+go install github.com/dmironenko/composer/cmd/composer@master
 ```
 
 Run these commands in a new directory:
@@ -93,8 +94,9 @@ settings, `compose` for Compose settings, and `secrets` for encrypted values.
 
 Each environment has its own namespace network. Only the ingress publishes host
 ports; app services can use `deploy.replicas`. Composer's built-in template
-reads `app.route_namespace` to connect ingress to the demo networks and
-`app.network_alias` to name the inner nginx in each environment. It also supplies
+reads `compose.x-composer.route_namespace` to connect ingress to the demo networks.
+Service names are automatic: `nginx` in prod, `nginx-stage` in stage, and
+`nginx-dan` in a personal environment named `dan`. The template also supplies
 restart and log rotation defaults; no copied Compose template is needed.
 
 See [the app guide](https://github.com/dmironenko/composer/blob/master/docs/apps.md)

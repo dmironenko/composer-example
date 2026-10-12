@@ -1,6 +1,5 @@
 app:
   config_revision: v1
-  network_alias: nginx
   absolute_redirect: 'off'
   proxy_read_timeout: 60s
 

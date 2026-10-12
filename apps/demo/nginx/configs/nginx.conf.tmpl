@@ -10,12 +10,12 @@ http {
 
     upstream api {
         zone api 64k;
-        server api-http:8080 resolve;
+        server api-http{{ if ne .Env "prod" }}-{{ .Env }}{{ end }}:8080 resolve;
     }
 
     upstream web {
         zone web 64k;
-        server web-http:8080 resolve;
+        server web-http{{ if ne .Env "prod" }}-{{ .Env }}{{ end }}:8080 resolve;
     }
 
     server {
