@@ -1,9 +1,9 @@
-app:
-  message: "api: production"
-
 build:
   repository: https://github.com/hashicorp/http-echo.git
   tag: v1.0.0
+
+app:
+  message: "api: production"
 
 compose:
   services:

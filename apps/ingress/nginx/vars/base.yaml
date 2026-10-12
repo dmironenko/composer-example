@@ -1,4 +1,8 @@
 app:
+  env:
+    CERTBOT_EMAIL: ops@example.invalid
+    USE_LOCAL_CA: "1"
+    RENEWAL_INTERVAL: 12h
   stage_token: ENC[YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBURmRORWV1aXk1cXRMbW5YSGxOMEdvYUhMTW9iZVlOaEpGYkdheHEvbkdZCnRZRlVBdkE1MFVlZTZrMTJyb2NBNG1PNVE2TzJaK1ZEZytLMmZ3K0NxSHMKLS0tIG55M09kbW5KL2pnMGl4QzBQVFIwSko3c3NNaGpKWjJ1M3N2U3VPVmgyOFkKAEhCq5Ghb69wz4wGAv8gLm51J2XPzkzlFMH+7vrdzgApIV9MWSaHeQzZVCfBAP0tptLj5qw=]
   proxy_read_timeout: 60s
   proxy_max_temp_file_size: 0
@@ -13,10 +17,7 @@ compose:
   services:
     nginx:
       image: jonasal/nginx-certbot:6.2.0-alpine
-      environment:
-        CERTBOT_EMAIL: ops@example.invalid
-        USE_LOCAL_CA: "1"
-        RENEWAL_INTERVAL: 12h
+      env_file: ./configs/app.env
       ports:
         - 127.0.0.1:18080:80
         - 127.0.0.1:18443:443

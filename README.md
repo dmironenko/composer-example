@@ -9,7 +9,7 @@ environment by cookie.
 
 Requires Go 1.26.8 or newer, Git, and a running Docker Engine or Docker Desktop.
 Install Composer from `master` and ensure `$HOME/go/bin` is on your `PATH`:
-The example uses changes not yet included in v1.0.0.
+The example uses changes not yet included in v1.0.0, including the `quoteEnv` helper.
 
 ```sh
 go install github.com/dmironenko/composer/cmd/composer@master
@@ -90,7 +90,14 @@ demo.agekey                # public demo key
 `base.yaml` holds shared settings. Every environment except `prod` also reads
 `stage.yaml`; without that file the app does not run there. This is why `/api/`
 works in stage but `/` returns an error: stage has no web app. Use `app` for app
-settings, `compose` for Compose settings, and `secrets` for encrypted values.
+settings and encrypted secrets, `compose` for Docker settings and Composer
+options, and `build` for source builds. Keep these top-level blocks in the order
+`build`, `app`, `compose`, omitting unused ones. Match the service's native
+config structure so YAML/JSON templates can use `toYAML`/`toJSON` directly.
+
+The ingress keeps environment variables in `app.env`. Its `app.env.tmpl` writes
+them to a file referenced by `compose.services.nginx.env_file`; keep the variable
+names expected by the image. Other app settings remain outside `app.env`.
 
 Each environment has its own namespace network. Only the ingress publishes host
 ports; app services can use `deploy.replicas`. Composer's built-in template
@@ -160,8 +167,8 @@ Configure a [remote Git source](https://github.com/dmironenko/composer/blob/mast
 For public TLS, update `apps/ingress/nginx/vars/base.yaml`:
 
 - Set `app.tls.domain` to your domain and `app.tls.https_port` to `443`.
-- Set `compose.services.nginx.environment.CERTBOT_EMAIL` to your email.
-- Set `compose.services.nginx.environment.USE_LOCAL_CA` to `"0"`.
+- Set `app.env.CERTBOT_EMAIL` to your email.
+- Set `app.env.USE_LOCAL_CA` to `"0"`.
 - Set `compose.services.nginx.ports` to `[80:80, 443:443]`.
 
 Point DNS to the server and open port 80 for HTTP-01 and 443 for HTTPS.
@@ -178,8 +185,8 @@ to run the agent through systemd.
 ## Contributing
 
 Write documentation in English. Use two-space YAML indentation, single-line
-`command` and `healthcheck.test` strings, and a blank line before `compose` and
-`secrets`. Shell commands must explicitly use `sh -c`. Keep demo values public.
+`command` and `healthcheck.test` strings, and a blank line before `compose`.
+Shell commands must explicitly use `sh -c`. Keep demo values public.
 
 Commit changes before running `composer validate --config ../composer.local.yaml`.
 Test deployments in a separate installation with its own state directory and

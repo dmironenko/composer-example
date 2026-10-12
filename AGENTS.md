@@ -7,8 +7,13 @@ This is a runnable GitOps example for Composer, not deployment state.
 - Quote YAML values only when needed to preserve their type or meaning.
 - Use two-space YAML indentation and single-line command/healthcheck.test strings.
 - Put a blank line before compose blocks. Use sh -c for shell commands.
-- Keep only application config values under app. Docker settings belong in compose;
-  Composer network helpers belong in compose.x-composer. build and enabled stay at the top level.
+- Use only build, app, and compose at the top level, in that order; omit unused blocks.
+- Keep application settings and secrets under app in the service's native shape;
+  render YAML/JSON directly with toYAML/toJSON instead of rebuilding the config in templates.
+- Put environment variables with their original names under app.env. Render an env
+  file and reference it through compose.services.<service>.env_file.
+- Docker settings belong in compose; Composer options, including enabled, belong
+  in compose.x-composer. The built-in Compose template does not read app.
 - Keep application secrets under app alongside ordinary settings as encrypted ENC[<base64>] values.
 - demo.agekey is an intentionally public demo identity; never use it for real secrets.
 - Keep real credentials, private keys, and rendered state out of Git.
