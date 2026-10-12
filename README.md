@@ -1,132 +1,114 @@
 # Composer example
 
-A GitOps example for [Composer](https://github.com/dmironenko/composer).
-The ingress nginx handles TLS with Certbot and routes requests to prod or stage.
-The API runs in both environments and builds locally from `Dockerfile.tmpl`;
-the web app runs only in prod.
+A runnable GitOps repository for [Composer](https://github.com/dmironenko/composer).
+It deploys an API built from source, a web app, and nginx with Certbot. Separate
+nginx instances route prod and stage traffic; a shared ingress selects the
+environment by cookie.
 
-```text
-apps/
-  demo/
-    api/                   # vars, message template, multi-stage Dockerfile.tmpl
-    web/                   # base.yaml, message template
-    nginx/                 # base.yaml, stage.yaml, nginx template
-  ingress/
-    nginx/                 # nginx + Certbot
-      vars/base.yaml       # TLS settings and an encrypted demo routing token
-      configs/
-templates/compose.yaml.tmpl
-host.yaml.example          # copy outside this repository
-demo.agekey                # public demo identity; never use for real secrets
-```
+## Quick start
 
-`prod` reads `base.yaml`; other environments add `stage.yaml` overrides.
-Missing `stage.yaml` disables an app outside prod. Keep app-specific settings
-under `app`, Compose settings under `compose`, and encrypted values under `secrets`.
-
-## Local quick start
-
-Requires Git, Go 1.26.3 or newer, and Docker Engine or Docker Desktop. Clone the
-repositories side by side into a new directory:
+Requires Go 1.26.8 or newer, Git, and a running Docker Engine or Docker Desktop.
+Install Composer and ensure `$HOME/go/bin` is on your `PATH`:
 
 ```sh
-git clone --branch master https://github.com/dmironenko/composer.git
+go install github.com/dmironenko/composer/cmd/composer@latest
+```
+
+Run these commands in a new directory:
+
+```sh
 git clone --branch master https://github.com/dmironenko/composer-example.git
-(cd composer && go build -o bin/composer ./cmd/composer)
 cd composer-example
 git branch dev master
 cp host.yaml.example ../composer.local.yaml
 install -m 600 demo.agekey ../composer-example.agekey
-../composer/bin/composer validate --config ../composer.local.yaml
-../composer/bin/composer apply --config ../composer.local.yaml --wait --timeout 15m
+composer apply --config ../composer.local.yaml --wait --timeout 15m
 ```
 
-Skip `git branch dev master` if `dev` already exists. Host configuration paths
-are relative to the host YAML file. Composer reads committed snapshots.
-The demo key and token are public; encryption here demonstrates the Composer secrets workflow.
+The first build downloads and compiles the API. The ingress creates a local TLS
+certificate and listens on `127.0.0.1:18080` and `127.0.0.1:18443`.
+Check that these ports are free before deploying. For another copy, change
+`installation` and `state_dir` in the host YAML, and change the published ports
+and `app.tls.https_port` in `apps/ingress/nginx/vars/base.yaml`. Commit app changes.
 
-The ingress binds `127.0.0.1:18080` and `127.0.0.1:18443`. For another copy, use a
-unique `installation` and `state_dir`, and choose free ports in
-`apps/ingress/nginx/vars/base.yaml`, including `app.tls.https_port`. Commit port changes
-to both branches. The ordinary YAML fields can be edited directly.
-
-Composer creates networks and volumes; nginx-certbot creates a local certificate.
-Check both environments, then start polling:
+Check both environments, then start watching for commits:
 
 ```sh
 curl -ki https://localhost:18443/api/
 curl -ki --cookie 'composer_stage=composer-example-test:stage' https://localhost:18443/api/
-../composer/bin/composer run --config ../composer.local.yaml
+composer run --config ../composer.local.yaml
 ```
 
-The first request returns `X-Composer-Environment: prod`; the second selects stage.
-`/api/` works in both; `/` fails in stage because it has no web app. Invalid or
-missing cookies select prod. An unavailable selected environment returns an error.
+The responses contain `X-Composer-Environment: prod` and `stage`, respectively.
+`-k` accepts the local development certificate. Ctrl-C stops Composer; containers
+keep running. Host paths are relative to `composer.local.yaml`.
+The example polls local Git every two seconds; use `source.poll_interval: 1m`
+when switching to a remote repository.
 
-Use a separate browser profile for stage to avoid sharing cookies and local storage.
-The cookie selects traffic; it does not authenticate users. `curl -k` skips
-verification of the local development certificate.
+The age key and `composer-example-test` token are public demo values. Use your
+own key and token before deploying a real service.
 
-## Change an application
+## Deploy a change
 
-Keep `composer run` running in another terminal:
+Keep Composer running and use another terminal in this repository:
 
 ```sh
 git switch dev
-# Edit apps/demo/api/vars/base.yaml, a config template, or a Dockerfile.
-git add apps templates
-git commit -m 'Update API'
-# Inspect stage, then promote the change:
+# edit apps/demo/api/vars/base.yaml.
+git add apps/demo/api/vars/base.yaml
+git commit -m 'feat: update API settings'
+```
+
+Check the stage URL, then promote the change:
+
+```sh
 git switch master
 git merge dev
 ```
 
-Local sources see commits without a push; remote sources need one. Config-only
-changes also trigger deployment. Revert a commit to roll back. For source builds,
-change `build.tag` in `base.yaml` and promote it with the same merge.
+Local mode reads commits without a push. Remote mode requires a push.
+Config-only changes also deploy. Revert the commit to roll back.
+For another API version, change `build.tag`; Docker builds it locally and keeps
+the image for reuse. The shared ingress follows `master`; test the inner nginx
+on `dev`.
 
-The shared ingress runs only from `master`. Test inner nginx routing on `dev`.
+## Repository layout
 
-## Custom Dockerfile
-
-`apps/demo/api/Dockerfile.tmpl` builds
-[http-echo](https://github.com/hashicorp/http-echo) from source. The builder stage
-reads `.Vars.build.repository` and `.Vars.build.tag` through Go templates,
-runs `git clone`, checks out the selected version, and runs `go build`.
-The final BusyBox image
-contains the compiled API and its license; Go, Git, and the source stay in the
-builder stage.
-
-Change `build.tag` or the Dockerfile on `dev`, verify stage, then merge into
-`master`. Config-only changes reuse the image. Matching prod/stage build inputs
-share an image. `build.tag` accepts a commit SHA, tag, or branch; the example uses
-`v1.0.0`. Moving an existing tag or branch does not trigger a rebuild: change the
-tag in GitOps to deploy another version.
-
-Composer passes the rendered Dockerfile and an empty build context to Docker.
-The Dockerfile handles the public HTTPS clone and checkout; host Git credentials
-are not forwarded into the build.
-
-## Networks and personal environments
-
-```mermaid
-flowchart LR
-    Client -->|HTTP / HTTPS| Ingress[nginx + Certbot]
-    Ingress --> Prod[nginx prod]
-    Ingress -->|stage cookie| Stage[nginx stage]
-    Prod --> ProdApps[API + web: demo/prod network]
-    Stage --> StageApps[API: demo/stage network]
+```text
+apps/
+  demo/
+    api/                   # prod + stage; custom Dockerfile and message config
+    web/                   # prod only
+    nginx/                 # per-environment routing
+  ingress/
+    nginx/                 # shared TLS ingress and encrypted routing token
+host.yaml.example          # copy outside Git
+demo.agekey                # public demo key
 ```
 
-Each environment has its own demo network. `app.route_namespace: demo` connects the
-ingress to these networks. Only the ingress publishes ports; apps can scale with
-`deploy.replicas`.
+`base.yaml` holds shared settings. Every environment except `prod` also reads
+`stage.yaml`; without that file the app does not run there. This is why `/api/`
+works in stage but `/` returns an error: stage has no web app. Use `app` for app
+settings, `compose` for Compose settings, and `secrets` for encrypted values.
 
-Create a Git branch and add it to the external host YAML:
+Each environment has its own namespace network. Only the ingress publishes host
+ports; app services can use `deploy.replicas`. Composer's built-in template
+reads `app.route_namespace` to connect ingress to the demo networks and
+`app.network_alias` to name the inner nginx in each environment. It also supplies
+restart and log rotation defaults; no copied Compose template is needed.
+
+See [the app guide](https://github.com/dmironenko/composer/blob/master/docs/apps.md)
+to add, configure, scale, or remove an app.
+
+## Personal environments
+
+Create a branch:
 
 ```sh
 git branch users/alice dev
 ```
+
+Add it to `source.branches` in the external host YAML:
 
 ```yaml
 source:
@@ -136,85 +118,67 @@ source:
     alice: users/alice
 ```
 
-`composer run` picks up the entry on its next pass. Use
-`composer_stage=composer-example-test:alice` to select it. The environment uses its
-branch's `stage.yaml` overrides and separate networks and volumes; prod data is
-not copied.
+Composer reloads the config on its next pass. Select the environment with
+`composer_stage=composer-example-test:alice`. It uses its branch's `base.yaml`
+and `stage.yaml`, with separate networks and volumes; prod data is not copied.
+Removing the mapping removes its containers and retains volumes/images.
+Adding or removing environments can briefly interrupt ingress as networks change.
 
-Adding or removing an environment can briefly interrupt ingress while its network
-attachments update. Removing the entry removes that environment's containers but
-keeps volumes and images. Failed fetches or missing branches preserve deployments.
+Missing or invalid cookies select prod. A valid token selecting an unavailable
+or unknown environment returns an error. The routing cookie does not authenticate
+users. Use a separate browser profile for stage to separate cookies and local storage.
 
-## Secrets
+## Builds and secrets
 
-The `secrets.stage_token` value at the bottom of `apps/ingress/nginx/vars/base.yaml`
-is encrypted with age. Field names and nesting remain visible. Composer reads
-the shared key from `age_key_file` and exposes the decrypted value to templates
-as `.Secrets.stage_token`.
+The API's `Dockerfile.tmpl` clones [http-echo](https://github.com/hashicorp/http-echo)
+and checks out `.Vars.build.tag` from `.Vars.build.repository`. A Go builder stage
+compiles it; the final BusyBox image contains the binary and license.
 
-Encrypt one value and paste the output after `stage_token:`:
+Change `build.tag` or the Dockerfile on `dev`, then merge into `master`.
+Matching build inputs reuse an image; config-only changes do not rebuild it.
+A tag, SHA, or branch is accepted, but moving the same tag or branch does not
+trigger a rebuild. Composer passes an empty build context and does not forward
+Git credentials. See [source builds](https://github.com/dmironenko/composer/blob/master/docs/builds.md).
 
-```sh
-printf '%s' 'composer-example-test' | ../composer/bin/composer secrets encrypt --key-file ../composer-example.agekey
-```
-
-More secrets can be added independently:
-
-```yaml
-secrets:
-  stage_token: ENC[...]
-  database:
-    password: ENC[...]
-```
-
-To read a value, run this command, paste only its `ENC[…]` string, and finish with Ctrl-D:
+`secrets.stage_token` in `apps/ingress/nginx/vars/base.yaml` is an individually
+encrypted age value. The host's `age_key_file` decrypts it for `.Secrets.stage_token`.
+For a demo, encrypt a replacement and paste the output into that field:
 
 ```sh
-../composer/bin/composer secrets decrypt --key-file ../composer-example.agekey
+printf '%s' 'another-demo-token' | composer secrets encrypt --key-file ../composer-example.agekey
 ```
 
-Before using the stack on a server, generate your own key outside Git:
+Commit the change and use the new token in your routing cookie. For real secrets,
+generate a private key outside Git, update `age_key_file`, and encrypt every
+secret with that key. Follow the [secrets guide](https://github.com/dmironenko/composer/blob/master/docs/secrets.md).
 
-```sh
-age-keygen -o ../composer-private.agekey
-chmod 600 ../composer-private.agekey
-```
+## Deploy on a server
 
-Encrypt a new token with that key and set `age_key_file: composer-private.agekey`
-in the external host YAML. All apps can use the same key; they need no additional
-key settings. Commit encrypted values only.
-See the [Composer secrets guide](https://github.com/dmironenko/composer/blob/master/docs/secrets.md).
+Configure a [remote Git source](https://github.com/dmironenko/composer/blob/master/docs/configuration.md#remote-git-and-authentication).
+For public TLS, update `apps/ingress/nginx/vars/base.yaml`:
 
-## Public TLS
+- Set `app.tls.domain` to your domain and `app.tls.https_port` to `443`.
+- Set `compose.services.nginx.environment.CERTBOT_EMAIL` to your email.
+- Set `compose.services.nginx.environment.USE_LOCAL_CA` to `"0"`.
+- Set `compose.services.nginx.ports` to `[80:80, 443:443]`.
 
+Point DNS to the server and open port 80 for HTTP-01 and 443 for HTTPS.
+The HTTP redirect excludes `/.well-known/acme-challenge/` so renewal still works.
+The inner nginx keeps redirects relative and forwards the original host and
+HTTPS scheme; internal container ports must not appear in browser redirects. Use a new
+empty certificate volume when switching from the local CA to public ACME.
 The [nginx-certbot image](https://github.com/JonasAlfredsson/docker-nginx-certbot)
-issues and renews certificates and reloads nginx.
+renews certificates and reloads nginx. Certificates persist in a named volume.
 
-Update `apps/ingress/nginx/vars/base.yaml`:
-
-- `app.tls.domain`: your domain; `app.tls.https_port: 443`.
-- `compose.services.nginx.environment.CERTBOT_EMAIL`: your email.
-- `compose.services.nginx.environment.USE_LOCAL_CA: "0"`.
-- `compose.services.nginx.ports`: `[80:80, 443:443]`.
-
-Point DNS to your server and open port 80 for HTTP-01. Certificates persist in a
-named volume. Use a new empty certificate volume when switching from the local CA
-to public ACME.
-
-On Ubuntu, install the agent with
-[composer install](https://github.com/dmironenko/composer/blob/master/docs/systemd.md).
+On Ubuntu, use [composer install](https://github.com/dmironenko/composer/blob/master/docs/systemd.md)
+to run the agent through systemd.
 
 ## Contributing
 
-Use two-space YAML indentation, single-line `command` and `healthcheck.test` strings,
-and a blank line before `compose` and `secrets`. Shell commands must explicitly use
-`sh -c`. Keep the checked-in example runnable with public demo values.
+Write documentation in English. Use two-space YAML indentation, single-line
+`command` and `healthcheck.test` strings, and a blank line before `compose` and
+`secrets`. Shell commands must explicitly use `sh -c`. Keep demo values public.
 
-Commit changes, then validate:
-
-```sh
-../composer/bin/composer validate --config ../composer.local.yaml
-```
-
-Test deployments in a separate installation with its own state directory and free
-ports. Describe your checks in the pull request.
+Commit changes before running `composer validate --config ../composer.local.yaml`.
+Test deployments in a separate installation with its own state directory and
+free ports. Describe your checks in the pull request.

@@ -3,6 +3,7 @@
 This is a runnable GitOps example for Composer, not deployment state.
 
 - Check Git status before edits and preserve existing work.
+- Write all documentation and comments in English. Use the installed `composer` command in guides.
 - Quote YAML values only when needed to preserve their type or meaning.
 - Use two-space YAML indentation and single-line command/healthcheck.test strings.
 - Put a blank line before compose and secrets blocks. Use sh -c for shell commands.
