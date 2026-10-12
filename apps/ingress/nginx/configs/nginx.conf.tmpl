@@ -9,9 +9,9 @@ map $http_upgrade $connection_upgrade {
 {{ range .Environments }}{{ if eq . "prod" }}{{ $default = "env_prod" }}{{ end }}{{ end }}
 map $cookie_composer_stage $environment_backend {
     default {{ quote $default }};
-    "~^{{ .Secrets.stage_token }}:" "";
+    "~^{{ .Vars.app.stage_token }}:" "";
 {{ range .Environments }}{{ if ne . "prod" }}
-    "{{ $.Secrets.stage_token }}:{{ . }}" env_{{ . }};
+    "{{ $.Vars.app.stage_token }}:{{ . }}" env_{{ . }};
 {{ end }}{{ end }}
 }
 

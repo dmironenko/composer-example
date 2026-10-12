@@ -142,8 +142,8 @@ A tag, SHA, or branch is accepted, but moving the same tag or branch does not
 trigger a rebuild. Composer passes an empty build context and does not forward
 Git credentials. See [source builds](https://github.com/dmironenko/composer/blob/master/docs/builds.md).
 
-`secrets.stage_token` in `apps/ingress/nginx/vars/base.yaml` is an individually
-encrypted age value. The host's `age_key_file` decrypts it for `.Secrets.stage_token`.
+`app.stage_token` in `apps/ingress/nginx/vars/base.yaml` is an individually
+encrypted age value. The host's `age_key_file` decrypts it for `.Vars.app.stage_token`.
 For a demo, encrypt a replacement and paste the output into that field:
 
 ```sh

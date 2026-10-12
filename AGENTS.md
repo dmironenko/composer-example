@@ -6,10 +6,10 @@ This is a runnable GitOps example for Composer, not deployment state.
 - Write all documentation and comments in English. Use the installed `composer` command in guides.
 - Quote YAML values only when needed to preserve their type or meaning.
 - Use two-space YAML indentation and single-line command/healthcheck.test strings.
-- Put a blank line before compose and secrets blocks. Use sh -c for shell commands.
+- Put a blank line before compose blocks. Use sh -c for shell commands.
 - Keep only application config values under app. Docker settings belong in compose;
-  Composer network helpers belong in compose.x-composer. build, enabled, and secrets stay at the top level.
-- Keep secrets last in vars files as a mapping with individually encrypted ENC[<base64>] values.
+  Composer network helpers belong in compose.x-composer. build and enabled stay at the top level.
+- Keep application secrets under app alongside ordinary settings as encrypted ENC[<base64>] values.
 - demo.agekey is an intentionally public demo identity; never use it for real secrets.
 - Keep real credentials, private keys, and rendered state out of Git.
 - Use composer secrets encrypt/decrypt with the shared age key.
