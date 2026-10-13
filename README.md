@@ -7,13 +7,15 @@ environment by cookie.
 
 ## Quick start
 
-Requires Go 1.26.8 or newer, Git, and a running Docker Engine or Docker Desktop.
-Install Composer from `master` and ensure `$HOME/go/bin` is on your `PATH`:
-The example uses changes not yet included in v1.0.0, including the `quoteEnv` helper.
+Requires Git and a running Docker Engine or Docker Desktop. Install Composer
+v2.0.0 on macOS or Linux and ensure `~/.local/bin` is on your `PATH`:
 
 ```sh
-go install github.com/dmironenko/composer/cmd/composer@master
+curl -fsSL https://raw.githubusercontent.com/dmironenko/composer/v2.0.0/install.sh | sh -s -- v2.0.0
 ```
+
+Go is not required. See [installation](https://github.com/dmironenko/composer#install)
+for PATH setup.
 
 Run these commands in a new directory:
 
