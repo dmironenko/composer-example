@@ -11,11 +11,8 @@ app:
     https_port: 18443
 
 compose:
-  x-composer:
-    route_namespace: demo
-
   services:
-    nginx:
+    ingress:
       image: jonasal/nginx-certbot:6.2.0-alpine
       env_file: ./configs/app.env
       ports:

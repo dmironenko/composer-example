@@ -96,13 +96,12 @@ options, and `build` for source builds. Keep these top-level blocks in the order
 config structure so YAML/JSON templates can use `toYAML`/`toJSON` directly.
 
 The ingress keeps environment variables in `app.env`. Its `app.env.tmpl` writes
-them to a file referenced by `compose.services.nginx.env_file`; keep the variable
+them to a file referenced by `compose.services.ingress.env_file`; keep the variable
 names expected by the image. Other app settings remain outside `app.env`.
 
-Each environment has its own namespace network. Only the ingress publishes host
-ports; app services can use `deploy.replicas`. Composer's built-in template
-reads `compose.x-composer.route_namespace` to connect ingress to the demo networks.
-Service names are automatic: `nginx` in prod, `nginx-stage` in stage, and
+All apps in an installation share a network. Only the ingress publishes host
+ports; app services can use `deploy.replicas`. The ingress reaches the inner
+nginx by its service name: `nginx` in prod, `nginx-stage` in stage, and
 `nginx-dan` in a personal environment named `dan`. The template also supplies
 restart and log rotation defaults; no copied Compose template is needed.
 
@@ -129,9 +128,9 @@ source:
 
 Composer reloads the config on its next pass. Select the environment with
 `composer_stage=composer-example-test:alice`. It uses its branch's `base.yaml`
-and `stage.yaml`, with separate networks and volumes; prod data is not copied.
+and `stage.yaml`, with separate projects and volumes; prod data is not copied.
 Removing the mapping removes its containers and retains volumes/images.
-Adding or removing environments can briefly interrupt ingress as networks change.
+Adding or removing environments can briefly interrupt ingress as routes change.
 
 Missing or invalid cookies select prod. A valid token selecting an unavailable
 or unknown environment returns an error. The routing cookie does not authenticate
@@ -169,7 +168,7 @@ For public TLS, update `apps/ingress/nginx/vars/base.yaml`:
 - Set `app.tls.domain` to your domain and `app.tls.https_port` to `443`.
 - Set `app.env.CERTBOT_EMAIL` to your email.
 - Set `app.env.USE_LOCAL_CA` to `"0"`.
-- Set `compose.services.nginx.ports` to `[80:80, 443:443]`.
+- Set `compose.services.ingress.ports` to `[80:80, 443:443]`.
 
 Point DNS to the server and open port 80 for HTTP-01 and 443 for HTTPS.
 The HTTP redirect excludes `/.well-known/acme-challenge/` so renewal still works.

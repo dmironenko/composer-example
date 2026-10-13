@@ -19,7 +19,7 @@ This is a runnable GitOps example for Composer, not deployment state.
 - Keep real credentials, private keys, and rendered state out of Git.
 - Use composer secrets encrypt/decrypt with the shared age key.
 - Keep host configuration outside this repository; host.yaml.example is a template.
-- One app directory is one Compose project; each namespace/environment has its own network.
+- One app directory is one Compose project; all apps in an installation share a network.
 - Prod reads base.yaml; every other environment reads base.yaml plus stage.yaml.
 - Missing stage.yaml disables an app outside prod. Keep shared settings in base.yaml.
 - Use image tags without digests. Only apps/ingress/nginx publishes ports; scalable apps have no container_name.
